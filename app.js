@@ -285,7 +285,136 @@ function explicarErro(erro) {
   if (mensagem.includes("before initialization")) {
     return "Uma variável foi usada antes da linha em que é criada.";
   }
+  if (erro && erro.name === NOME_ERRO_LACO) {
+    return "A condição do laço nunca ficou falsa. Confiram se a variável testada na condição muda dentro do laço: em while (x !== 1), x precisa mudar a cada volta.";
+  }
   return "";
+}
+
+// ---------- Infinite-loop guard ----------
+// The workbench runs on the page's own thread, so an endless loop would freeze the tab.
+// Before running, every while/for condition gets a call to __guarda(), which throws once
+// the current synchronous run has looped for longer than LIMITE_LACO_MS.
+
+const LIMITE_LACO_MS = 2000;
+const NOME_ERRO_LACO = "Laço sem fim";
+
+function criarGuarda() {
+  let inicio = null;
+  let voltas = 0;
+  return function __guarda() {
+    if (inicio === null) {
+      inicio = Date.now();
+      // Reset after the current synchronous chunk, so loops inside later click handlers get their own budget.
+      queueMicrotask(() => {
+        inicio = null;
+      });
+    }
+    voltas++;
+    if (voltas % 1000 === 0 && Date.now() - inicio > LIMITE_LACO_MS) {
+      inicio = null;
+      const erro = new Error(`a bancada interrompeu o código depois de ${LIMITE_LACO_MS / 1000} segundos.`);
+      erro.name = NOME_ERRO_LACO;
+      throw erro;
+    }
+    return true;
+  };
+}
+
+// Returns the index right after the string, template or comment starting at i, or -1.
+function pularLiteral(codigo, i) {
+  const c = codigo[i];
+  if (c === "/" && codigo[i + 1] === "/") {
+    const fim = codigo.indexOf("\n", i);
+    return fim === -1 ? codigo.length : fim;
+  }
+  if (c === "/" && codigo[i + 1] === "*") {
+    const fim = codigo.indexOf("*/", i + 2);
+    return fim === -1 ? codigo.length : fim + 2;
+  }
+  if (c === '"' || c === "'" || c === "`") {
+    let j = i + 1;
+    while (j < codigo.length && codigo[j] !== c) {
+      j += codigo[j] === "\\" ? 2 : 1;
+    }
+    return j + 1;
+  }
+  return -1;
+}
+
+// Finds the ")" matching the "(" at abre; also collects the top-level ";" inside it.
+function fecharParenteses(codigo, abre) {
+  const separadores = [];
+  let profundidade = 0;
+  let i = abre;
+  while (i < codigo.length) {
+    const depois = pularLiteral(codigo, i);
+    if (depois !== -1) {
+      i = depois;
+      continue;
+    }
+    const c = codigo[i];
+    if (c === "(" || c === "[" || c === "{") {
+      profundidade++;
+    } else if (c === ")" || c === "]" || c === "}") {
+      profundidade--;
+      if (profundidade === 0) {
+        return { fecha: i, separadores };
+      }
+    } else if (c === ";" && profundidade === 1) {
+      separadores.push(i);
+    }
+    i++;
+  }
+  return null;
+}
+
+function instrumentarLacos(codigo) {
+  const insercoes = [];
+  let i = 0;
+  while (i < codigo.length) {
+    const depois = pularLiteral(codigo, i);
+    if (depois !== -1) {
+      i = depois;
+      continue;
+    }
+    const palavra = /^(while|for)\b/.exec(codigo.slice(i, i + 6));
+    const anterior = codigo[i - 1] || "";
+    if (palavra && !/[\w$.]/.test(anterior)) {
+      const abre = codigo.slice(i + palavra[1].length).search(/\S/) + i + palavra[1].length;
+      const parenteses = codigo[abre] === "(" ? fecharParenteses(codigo, abre) : null;
+      if (parenteses && palavra[1] === "while") {
+        insercoes.push([abre + 1, "__guarda() && ("], [parenteses.fecha, ")"]);
+      } else if (parenteses && parenteses.separadores.length === 2) {
+        // for (inicio; condicao; passo): for...of and for...in have no ";" and stay untouched.
+        const [primeiro, segundo] = parenteses.separadores;
+        if (codigo.slice(primeiro + 1, segundo).trim() === "") {
+          insercoes.push([segundo, "__guarda()"]);
+        } else {
+          insercoes.push([primeiro + 1, "__guarda() && ("], [segundo, ")"]);
+        }
+      }
+      i += palavra[1].length;
+      continue;
+    }
+    i++;
+  }
+  let resultado = codigo;
+  for (const [posicao, texto] of insercoes.sort((a, b) => b[0] - a[0])) {
+    resultado = resultado.slice(0, posicao) + texto + resultado.slice(posicao);
+  }
+  return resultado;
+}
+
+// Compiles the student's code with the guard; falls back to the original code if instrumenting fails.
+function compilarComGuarda(codigo) {
+  try {
+    const funcao = new Function("__guarda", instrumentarLacos(codigo));
+    const guarda = criarGuarda();
+    return () => funcao(guarda);
+  } catch (erro) {
+    return new Function(codigo);
+  }
 }
 
 function mostrarErro(erro) {
@@ -306,7 +435,7 @@ function executarCodigo() {
   escreverSaida("> executando...", "info");
   try {
     // Each run gets its own scope, so let/const can be declared again on the next run.
-    const resultado = new Function(codigo)();
+    const resultado = compilarComGuarda(codigo)();
     if (resultado !== undefined) {
       escreverSaida(`(retorno) ${formatarValor(resultado)}`, "log");
     }
@@ -439,6 +568,8 @@ function renderizarDicas(etapa, revelada) {
       el.dicas.append(bloco);
     }
   });
+  soltarBalaoOrfao();
+  aplicarGlossario(el.dicas);
 
   if (usadas < etapa.dicas.length) {
     const botao = document.createElement("button");
@@ -489,6 +620,7 @@ function renderizar() {
   const ehFinal = atual === totalFechaduras();
   const resolvida = atual < maiorAberta();
 
+  fecharBalao();
   el.etapa.innerHTML = `
     <div class="etapa-cabeca">
       <span class="placa" aria-hidden="true">${icone(ICONES_FECHADURA[atual] || "lock")}${ehFinal ? "" : `<span class="placa-num">${atual}</span>`}</span>
@@ -506,6 +638,7 @@ function renderizar() {
   }
 
   rodarSetup(etapa);
+  aplicarGlossario(el.etapa);
   renderizarDicas(etapa);
 
   el.formResposta.hidden = ehFinal;
@@ -604,11 +737,444 @@ async function restaurarProgresso(evento) {
 function mostrarMensagem(texto, status, comoHtml) {
   if (comoHtml) {
     el.mensagem.innerHTML = texto;
+    soltarBalaoOrfao();
+    aplicarGlossario(el.mensagem);
   } else {
     el.mensagem.textContent = texto;
   }
   el.mensagem.dataset.status = status;
 }
+
+// ---------- Glossary ----------
+
+// Plain-language explanations for the JavaScript terms used in the locks.
+// Public on purpose: nothing here reveals an answer.
+const MDN = "https://developer.mozilla.org/pt-BR/docs/";
+const MDN_JS = MDN + "Web/JavaScript/Reference/";
+const MDN_OPERADORES = MDN + "Web/JavaScript/Guide/Expressions_and_operators";
+const GLOSSARIO = {
+  getElementById: {
+    oQue: "Um método do document que encontra um elemento da página pelo seu id.",
+    serve: "Pegar um elemento do HTML para ler ou mudar o que ele mostra.",
+    url: MDN + "Web/API/Document/getElementById",
+  },
+  textContent: {
+    oQue: "Propriedade com o texto de um elemento, sem as tags HTML.",
+    serve: "Ler ou trocar só o texto. Tags e comentários HTML ficam de fora.",
+    url: MDN + "Web/API/Node/textContent",
+  },
+  innerHTML: {
+    oQue: "Propriedade com o conteúdo HTML de um elemento, com tags e comentários.",
+    serve: "Ler o HTML completo ou inserir HTML novo. Nunca coloque nele texto digitado pelo usuário.",
+    url: MDN + "Web/API/Element/innerHTML",
+  },
+  "console.log": {
+    oQue: "Função que escreve uma mensagem no console (a saída da bancada).",
+    serve: "Ver valores enquanto o código roda e descobrir onde está o erro.",
+    url: MDN + "Web/API/console/log_static",
+  },
+  let: {
+    oQue: "Palavra que cria uma variável cujo valor pode mudar depois.",
+    serve: "Guardar valores que vão mudar, como um contador.",
+    url: MDN_JS + "Statements/let",
+  },
+  const: {
+    oQue: "Palavra que cria uma constante: o nome não pode receber outro valor.",
+    serve: "Guardar o que não muda, como um elemento encontrado com getElementById.",
+    url: MDN_JS + "Statements/const",
+  },
+  for: {
+    oQue: "Laço de repetição com início, condição e passo: for (let i = 0; i < 10; i++).",
+    serve: "Repetir um bloco de código um número conhecido de vezes.",
+    url: MDN_JS + "Statements/for",
+  },
+  while: {
+    oQue: "Laço que repete enquanto a condição for verdadeira.",
+    serve: "Repetir quando não se sabe quantas voltas serão. Algo precisa mudar dentro dele para o laço parar.",
+    url: MDN_JS + "Statements/while",
+  },
+  if: {
+    oQue: "Estrutura de decisão: if (se), else if (senão, se) e else (senão).",
+    serve: "Executar um bloco só quando a condição é verdadeira, e outro quando não é.",
+    url: MDN_JS + "Statements/if...else",
+  },
+  switch: {
+    oQue: "Estrutura que compara um valor com várias opções (case).",
+    serve: "Escolher entre muitas opções sem uma fila de if.",
+    url: MDN_JS + "Statements/switch",
+  },
+  case: {
+    oQue: "Uma opção dentro do switch.",
+    serve: "Dizer o que fazer quando o valor é igual ao do case. Sem break, o código continua no case seguinte.",
+    url: MDN_JS + "Statements/switch",
+  },
+  default: {
+    oQue: "A opção do switch usada quando nenhum case combina.",
+    serve: "Tratar valores inesperados.",
+    url: MDN_JS + "Statements/switch",
+  },
+  break: {
+    oQue: "Comando que interrompe o switch ou o laço em que está.",
+    serve: "Sair do case depois de executá-lo, ou parar um laço antes do fim.",
+    url: MDN_JS + "Statements/break",
+  },
+  "%": {
+    oQue: "Operador resto da divisão: 7 % 2 é 1.",
+    serve: "Saber se um número é par (n % 2 === 0) ou fazer algo a cada N voltas.",
+    url: MDN_OPERADORES,
+  },
+  "===": {
+    oQue: "Igualdade estrita: compara valor e tipo. \"5\" === 5 é false.",
+    serve: "Testar se dois valores são iguais sem conversão automática.",
+    url: MDN_OPERADORES,
+  },
+  "!==": {
+    oQue: "Diferença estrita: é true quando o valor ou o tipo são diferentes.",
+    serve: "Escrever condições do tipo \"enquanto for diferente de\".",
+    url: MDN_OPERADORES,
+  },
+  "&&": {
+    oQue: "E lógico: só é true quando os dois lados são true.",
+    serve: "Exigir duas condições ao mesmo tempo.",
+    url: MDN_JS + "Operators/Logical_AND",
+  },
+  "<": {
+    oQue: "Operador menor que: 3 < 5 é true.",
+    serve: "Comparar números, como na condição de um for (i < 10).",
+    url: MDN_OPERADORES,
+  },
+  "<=": {
+    oQue: "Operador menor ou igual: 5 <= 5 é true.",
+    serve: "Comparar números incluindo o próprio limite.",
+    url: MDN_OPERADORES,
+  },
+  "=>": {
+    oQue: "Arrow function: uma forma curta de escrever uma função.",
+    serve: "Escrever funções pequenas, por exemplo para passar como parâmetro.",
+    url: MDN_JS + "Functions/Arrow_functions",
+  },
+  Number: {
+    oQue: "Função que converte um valor em número: Number(\"42\") é 42.",
+    serve: "Transformar o texto de um campo (.value) em número antes de fazer contas.",
+    url: MDN_JS + "Global_Objects/Number",
+  },
+  value: {
+    oQue: "Propriedade com o que está escrito em um campo de formulário (input).",
+    serve: "Ler o que o usuário digitou. O valor sempre chega como texto.",
+    url: MDN + "Web/API/HTMLInputElement",
+  },
+  length: {
+    oQue: "Propriedade com o tamanho de um texto (quantos caracteres) ou de uma lista.",
+    serve: "Saber o tamanho e percorrer um texto com for, letra por letra.",
+    url: MDN_JS + "Global_Objects/String/length",
+  },
+  "Math.sqrt": {
+    oQue: "Função que calcula a raiz quadrada: Math.sqrt(9) é 3.",
+    serve: "Contas com raiz, como distâncias.",
+    url: MDN_JS + "Global_Objects/Math/sqrt",
+  },
+  "Math.floor": {
+    oQue: "Função que arredonda para baixo: Math.floor(4.9) é 4.",
+    serve: "Pegar só a parte inteira de um número.",
+    url: MDN_JS + "Global_Objects/Math/floor",
+  },
+  "Math.round": {
+    oQue: "Função que arredonda para o inteiro mais próximo: Math.round(4.5) é 5.",
+    serve: "Arredondar resultados de contas.",
+    url: MDN_JS + "Global_Objects/Math/round",
+  },
+  "Math.abs": {
+    oQue: "Função que devolve o valor absoluto, sem sinal: Math.abs(-3) é 3.",
+    serve: "Calcular distâncias e diferenças que não podem ser negativas.",
+    url: MDN_JS + "Global_Objects/Math/abs",
+  },
+  function: {
+    oQue: "Palavra que cria uma função: um bloco de código com nome que pode ser chamado várias vezes.",
+    serve: "Organizar e reaproveitar código.",
+    url: MDN_JS + "Statements/function",
+  },
+  return: {
+    oQue: "Comando que devolve um valor de dentro da função e encerra a função.",
+    serve: "Entregar o resultado da função para quem a chamou.",
+    url: MDN_JS + "Statements/return",
+  },
+  addEventListener: {
+    oQue: "Método que faz um elemento esperar um evento e chamar uma função quando ele acontece.",
+    serve: "Reagir a cliques e teclas. Passe o nome da função, sem parênteses.",
+    url: MDN + "Web/API/EventTarget/addEventListener",
+  },
+  click: {
+    oQue: "Evento disparado quando o elemento é clicado ou tocado.",
+    serve: "É o nome do evento usado em addEventListener(\"click\", ...).",
+    url: MDN + "Web/API/Element/click_event",
+  },
+  callback: {
+    oQue: "Função passada como parâmetro para outra função, que a chama depois.",
+    serve: "O addEventListener guarda a sua função e só a chama quando o evento acontece.",
+    url: MDN + "Glossary/Callback_function",
+  },
+  null: {
+    oQue: "Valor que significa \"nenhum objeto\". getElementById devolve null quando não encontra o id.",
+    serve: "Indicar ausência. O erro \"Cannot read properties of null\" quase sempre é um id errado.",
+    url: MDN_JS + "Operators/null",
+  },
+  undefined: {
+    oQue: "Valor de algo que ainda não recebeu valor.",
+    serve: "Aparece em variável sem valor ou em função sem return.",
+    url: MDN_JS + "Global_Objects/undefined",
+  },
+};
+
+// Other spellings that point to the same entry (inline code and concept chips).
+const APELIDOS_GLOSSARIO = {
+  else: "if",
+  "if/else": "if",
+  "else if": "if",
+  "operador %": "%",
+  "Number()": "Number",
+  ".value": "value",
+  ".length": "length",
+  '"click"': "click",
+  "'click'": "click",
+  "evento de clique": "click",
+  "função como parâmetro": "callback",
+};
+
+// Only exact tokens are wrapped, so the text of the page stays the same.
+// Operators need spaces around them, which keeps "<li>" and "x%" untouched.
+const PADRAO_TERMOS = new RegExp(
+  [
+    String.raw`(?<![\w$])(?:getElementById|textContent|innerHTML|addEventListener|console\.log|Math\.(?:sqrt|floor|round|abs)|Number|let|const|for|while|if|else|switch|case|default|break|function|return|null|undefined)(?![\w$])`,
+    String.raw`(?<=\.)(?:value|length)(?![\w$])`,
+    String.raw`"click"|'click'`,
+    String.raw`(?<=^|\s)(?:===|!==|&&|<=|<|%|=>)(?=\s|$)`,
+  ].join("|"),
+  "g",
+);
+
+function entradaGlossario(texto) {
+  const chave = APELIDOS_GLOSSARIO[texto] || texto;
+  return Object.hasOwn(GLOSSARIO, chave) ? chave : null;
+}
+
+function criarGatilhoTermo(texto, chave) {
+  const botao = document.createElement("button");
+  botao.type = "button";
+  botao.className = "termo";
+  botao.textContent = texto;
+  botao.dataset.termo = chave;
+  botao.setAttribute("aria-expanded", "false");
+  return botao;
+}
+
+// Code the pair must read with their own code (anything inside an element
+// with an id, like #comandos or #mural) is left exactly as written.
+function codigoProtegido(codigo, raiz) {
+  for (let no = codigo; no && no !== raiz; no = no.parentElement) {
+    if (no.id || no.classList.contains("cofre")) return true;
+  }
+  return false;
+}
+
+function envolverTermos(codigo) {
+  const textos = [];
+  const andarilho = document.createTreeWalker(codigo, NodeFilter.SHOW_TEXT);
+  while (andarilho.nextNode()) textos.push(andarilho.currentNode);
+  textos.forEach((noTexto) => {
+    if (noTexto.parentElement.closest(".termo")) return;
+    const texto = noTexto.nodeValue;
+    const pedacos = [];
+    let ultimo = 0;
+    for (const achado of texto.matchAll(PADRAO_TERMOS)) {
+      const chave = entradaGlossario(achado[0]);
+      if (!chave) continue;
+      if (achado.index > ultimo) pedacos.push(texto.slice(ultimo, achado.index));
+      pedacos.push(criarGatilhoTermo(achado[0], chave));
+      ultimo = achado.index + achado[0].length;
+    }
+    if (pedacos.length === 0) return;
+    if (ultimo < texto.length) pedacos.push(texto.slice(ultimo));
+    noTexto.replaceWith(...pedacos);
+  });
+}
+
+function aplicarGlossario(raiz) {
+  raiz.querySelectorAll("code").forEach((codigo) => {
+    if (codigo.closest("pre") || codigoProtegido(codigo, raiz)) return;
+    envolverTermos(codigo);
+  });
+  raiz.querySelectorAll(".conceitos li").forEach((chip) => {
+    const texto = chip.textContent.trim();
+    const chave = entradaGlossario(texto);
+    if (!chave || chip.querySelector(".termo")) return;
+    chip.replaceChildren(criarGatilhoTermo(texto, chave));
+  });
+}
+
+// One balloon at a time. It is created on open and removed on close, so it
+// never shows up in the textContent the pair reads with their code.
+const balao = { gatilho: null, elemento: null, fixo: false, abrir: 0, fechar: 0, calado: null };
+const suportaPopover = typeof HTMLElement.prototype.showPopover === "function";
+
+function montarBalao(chave, texto) {
+  const entrada = GLOSSARIO[chave];
+  const caixa = document.createElement("span");
+  caixa.className = "balao";
+  caixa.id = "app-balao-termo";
+  caixa.setAttribute("role", "group");
+  caixa.setAttribute("aria-label", `Glossário: ${texto}`);
+  const titulo = document.createElement("span");
+  titulo.className = "balao-titulo";
+  titulo.textContent = texto;
+  const linha = (rotulo, conteudo) => {
+    const p = document.createElement("span");
+    p.className = "balao-linha";
+    const forte = document.createElement("strong");
+    forte.textContent = `${rotulo} `;
+    p.append(forte, conteudo);
+    return p;
+  };
+  const link = document.createElement("a");
+  link.href = entrada.url;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.textContent = "Ler no MDN";
+  const aviso = document.createElement("span");
+  aviso.className = "visualmente-oculto";
+  aviso.textContent = " (abre em nova aba)";
+  link.append(aviso);
+  caixa.append(titulo, linha("O que é:", entrada.oQue), linha("Para que serve:", entrada.serve), link);
+  caixa.addEventListener("pointerenter", () => clearTimeout(balao.fechar));
+  caixa.addEventListener("pointerleave", (evento) => {
+    if (evento.pointerType === "mouse") agendarFecharBalao();
+  });
+  caixa.addEventListener("focusout", aoSairDoFoco);
+  return caixa;
+}
+
+function posicionarBalao() {
+  const { gatilho, elemento } = balao;
+  if (!gatilho || !elemento) return;
+  const margem = 16;
+  const distancia = 8;
+  const alvo = gatilho.getBoundingClientRect();
+  const largura = elemento.offsetWidth;
+  const altura = elemento.offsetHeight;
+  let topo = alvo.bottom + distancia;
+  if (topo + altura > window.innerHeight - margem && alvo.top - distancia - altura >= margem) {
+    topo = alvo.top - distancia - altura;
+    elemento.dataset.lado = "cima";
+  } else {
+    elemento.dataset.lado = "baixo";
+  }
+  const maximo = document.documentElement.clientWidth - margem - largura;
+  const esquerda = Math.max(margem, Math.min(alvo.left, maximo));
+  elemento.style.top = `${Math.round(topo)}px`;
+  elemento.style.left = `${Math.round(esquerda)}px`;
+}
+
+function abrirBalao(gatilho, fixo) {
+  clearTimeout(balao.abrir);
+  clearTimeout(balao.fechar);
+  if (balao.gatilho === gatilho) {
+    balao.fixo = balao.fixo || fixo;
+    return;
+  }
+  fecharBalao();
+  const caixa = montarBalao(gatilho.dataset.termo, gatilho.textContent);
+  gatilho.after(caixa);
+  if (suportaPopover) {
+    caixa.popover = "manual";
+    caixa.showPopover();
+  }
+  balao.gatilho = gatilho;
+  balao.elemento = caixa;
+  balao.fixo = fixo;
+  gatilho.setAttribute("aria-expanded", "true");
+  gatilho.setAttribute("aria-controls", caixa.id);
+  posicionarBalao();
+  requestAnimationFrame(() => caixa.classList.add("visivel"));
+}
+
+function fecharBalao(devolverFoco) {
+  clearTimeout(balao.abrir);
+  clearTimeout(balao.fechar);
+  const { gatilho, elemento } = balao;
+  if (!gatilho) return;
+  balao.gatilho = null;
+  balao.elemento = null;
+  balao.fixo = false;
+  gatilho.setAttribute("aria-expanded", "false");
+  gatilho.removeAttribute("aria-controls");
+  elemento.remove();
+  if (devolverFoco && gatilho.isConnected) {
+    // Esc returns focus to the term; that focus must not reopen the balloon.
+    balao.calado = gatilho;
+    gatilho.focus();
+  }
+}
+
+// The trigger was replaced by a re-render: forget the balloon that went with it.
+function soltarBalaoOrfao() {
+  if (balao.gatilho && !balao.gatilho.isConnected) fecharBalao();
+}
+
+function agendarFecharBalao() {
+  clearTimeout(balao.abrir);
+  if (balao.fixo) return;
+  clearTimeout(balao.fechar);
+  balao.fechar = setTimeout(() => fecharBalao(), 200);
+}
+
+function dentroDoBalao(no) {
+  return Boolean(no && (balao.gatilho?.contains(no) || balao.elemento?.contains(no)));
+}
+
+function aoSairDoFoco(evento) {
+  if (balao.gatilho && !dentroDoBalao(evento.relatedTarget)) fecharBalao();
+}
+
+document.addEventListener("pointerover", (evento) => {
+  if (evento.pointerType !== "mouse") return;
+  const gatilho = evento.target.closest?.(".termo");
+  if (!gatilho || gatilho === balao.gatilho) return;
+  clearTimeout(balao.abrir);
+  balao.abrir = setTimeout(() => abrirBalao(gatilho, false), 100);
+});
+document.addEventListener("pointerout", (evento) => {
+  if (evento.pointerType !== "mouse") return;
+  const gatilho = evento.target.closest?.(".termo");
+  if (!gatilho || gatilho.contains(evento.relatedTarget)) return;
+  if (gatilho === balao.gatilho) agendarFecharBalao();
+  else clearTimeout(balao.abrir);
+});
+document.addEventListener("focusin", (evento) => {
+  const gatilho = evento.target.closest?.(".termo");
+  if (gatilho && gatilho !== balao.calado) abrirBalao(gatilho, false);
+});
+document.addEventListener("focusout", (evento) => {
+  if (!evento.target.closest?.(".termo")) return;
+  balao.calado = null;
+  aoSairDoFoco(evento);
+});
+document.addEventListener("click", (evento) => {
+  const gatilho = evento.target.closest?.(".termo");
+  if (!gatilho) return;
+  // A click (or tap) pins the balloon; a second click on a pinned one closes it.
+  if (balao.gatilho === gatilho && balao.fixo) fecharBalao();
+  else abrirBalao(gatilho, true);
+});
+document.addEventListener("pointerdown", (evento) => {
+  if (balao.gatilho && !dentroDoBalao(evento.target)) fecharBalao();
+});
+document.addEventListener("keydown", (evento) => {
+  if (evento.key === "Escape" && balao.gatilho) {
+    evento.stopPropagation();
+    fecharBalao(true);
+  }
+});
+window.addEventListener("resize", posicionarBalao);
+window.addEventListener("scroll", posicionarBalao, { capture: true, passive: true });
 
 // Restart the CSS shake even when two wrong answers come in a row.
 function tremer(elemento) {

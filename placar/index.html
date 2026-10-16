@@ -1,0 +1,865 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Placar Web Riddle JS</title>
+  <meta name="robots" content="noindex">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;700&family=Big+Shoulders+Stencil:wght@700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+  <style>
+    /* Teacher-only scoreboard. Source lives in the planning repo. fonte/build.mjs copies it to
+       web-riddle-js/placar/ (without the verificacao.js tag) only together with a passphrase-encrypted
+       verificacao.json; the plain verificacao.js is never published. */
+    :root {
+      --papel: #e8ebe6;
+      --folha: #f6f7f3;
+      --tinta: #182a3a;
+      --suave: #4f5f6d;
+      --linha: #c9d0c8;
+      --latao: #8a5a12;
+      --latao-forte: #b7791f;
+      --latao-fundo: #f3e6cc;
+      --ok: #2f7d4a;
+      --ok-fundo: #e1efe4;
+      --erro: #b02a24;
+      --erro-fundo: #f8e1df;
+      --aviso: #7a5500;
+      --aviso-fundo: #fbefd0;
+      --grade: rgba(24, 42, 58, 0.06);
+      --codigo-fundo: #142230;
+      --codigo-texto: #e4e9ee;
+      --display: "Big Shoulders Stencil", "Arial Narrow", Impact, sans-serif;
+      --corpo: "Atkinson Hyperlegible Next", "Segoe UI", Verdana, sans-serif;
+      --mono: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+      color-scheme: light;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --papel: #0f1a24;
+        --folha: #162432;
+        --tinta: #e4e9ee;
+        --suave: #a7b4c0;
+        --linha: #2b3d4e;
+        --latao: #e0a640;
+        --latao-forte: #e0a640;
+        --latao-fundo: #2c2414;
+        --ok: #7fd39a;
+        --ok-fundo: #15301f;
+        --erro: #ff8a80;
+        --erro-fundo: #3a1c1a;
+        --aviso: #f2c75c;
+        --aviso-fundo: #2f2611;
+        --grade: rgba(228, 233, 238, 0.04);
+        --codigo-fundo: #0a131b;
+        color-scheme: dark;
+      }
+    }
+
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+
+    body {
+      margin: 0;
+      background-color: var(--papel);
+      background-image:
+        linear-gradient(var(--grade) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grade) 1px, transparent 1px);
+      background-size: 24px 24px;
+      color: var(--tinta);
+      font-family: var(--corpo);
+      line-height: 1.5;
+    }
+
+    :focus-visible { outline: 3px solid var(--latao-forte); outline-offset: 2px; }
+
+    .pagina { max-width: 1120px; margin: 0 auto; padding: 24px 16px 48px; }
+
+    header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 8px 24px; margin-bottom: 20px; }
+    h1 { margin: 0; font-family: var(--display); font-size: clamp(2.2rem, 6vw, 3.4rem); line-height: 1; letter-spacing: 0.01em; }
+    h1 span { color: var(--latao-forte); }
+    h2 { margin: 0 0 10px; font-family: var(--display); font-size: 1.7rem; line-height: 1.1; }
+
+    .folha { margin-bottom: 20px; padding: 18px 20px; border: 1px solid var(--linha); border-radius: 6px; background: var(--folha); box-shadow: 0 1px 0 var(--linha); }
+
+    .estado-verificacao { margin: 0; padding: 8px 12px; border-radius: 6px; font-size: 0.95rem; }
+    .estado-verificacao[data-status="erro"] { background: var(--erro-fundo); color: var(--erro); }
+
+    label { display: block; margin-bottom: 6px; font-weight: 700; }
+    textarea, input {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--linha); border-radius: 6px;
+      background: var(--papel); color: var(--tinta); font: inherit;
+    }
+    textarea { min-height: 110px; font-family: var(--mono); font-size: 0.8rem; word-break: break-all; resize: vertical; }
+
+    .acoes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    button {
+      padding: 9px 16px; border: 1px solid var(--tinta); border-radius: 6px;
+      background: transparent; color: var(--tinta); font: inherit; font-weight: 700; cursor: pointer;
+      transition: transform 0.12s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 0.12s;
+    }
+    button:hover { background: var(--latao-fundo); }
+    button:active { transform: scale(0.97); }
+    button.primario { border-color: var(--tinta); background: var(--tinta); color: var(--folha); }
+    button.primario:hover { background: var(--latao); border-color: var(--latao); color: #fff; }
+    button.perigo { border-color: var(--erro); color: var(--erro); }
+    button.pequeno { padding: 4px 10px; font-size: 0.85rem; }
+
+    .retornos { margin: 10px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+    .retornos li { padding: 6px 10px; border-radius: 6px; font-size: 0.92rem; }
+    .retornos [data-status="ok"] { background: var(--ok-fundo); color: var(--ok); }
+    .retornos [data-status="aviso"] { background: var(--aviso-fundo); color: var(--aviso); }
+    .retornos [data-status="erro"] { background: var(--erro-fundo); color: var(--erro); }
+
+    details.regras summary { cursor: pointer; font-weight: 700; }
+    .campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-top: 12px; }
+    .campos label { font-weight: 400; font-size: 0.92rem; }
+    .nota { color: var(--suave); font-size: 0.9rem; }
+
+    .tabela-rolagem { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+    th, td { padding: 8px 10px; border-bottom: 1px solid var(--linha); text-align: left; vertical-align: top; }
+    th { font-size: 0.85rem; color: var(--suave); font-weight: 700; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .posicao { font-family: var(--display); font-size: 1.6rem; line-height: 1; color: var(--latao-forte); }
+    .pontos { font-family: var(--display); font-size: 1.5rem; line-height: 1; }
+
+    .trilha { display: flex; gap: 3px; margin-top: 4px; }
+    .trilha span { width: 14px; height: 14px; border: 2px solid var(--linha); border-radius: 50%; }
+    .trilha span.aberta { border-color: var(--ok); background: var(--ok); }
+    .trilha span.falsa { border-color: var(--erro); background: var(--erro-fundo); }
+
+    .selo { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 0.8rem; font-weight: 700; white-space: nowrap; }
+    .selo.ok { background: var(--ok-fundo); color: var(--ok); }
+    .selo.aviso { background: var(--aviso-fundo); color: var(--aviso); }
+    .selo.erro { background: var(--erro-fundo); color: var(--erro); }
+
+    .dupla { margin-top: 14px; border-top: 2px solid var(--tinta); padding-top: 12px; }
+    .dupla > summary { cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+    .dupla > summary strong { font-size: 1.15rem; }
+    .resumo-dupla { display: flex; flex-wrap: wrap; gap: 6px 20px; margin: 10px 0; padding: 0; list-style: none; }
+    .alertas { margin: 8px 0; padding-left: 20px; color: var(--aviso); }
+    .codigo-bancada summary { cursor: pointer; color: var(--latao); font-size: 0.9rem; }
+    pre {
+      margin: 6px 0 0; padding: 12px; overflow-x: auto; border-radius: 6px;
+      background: var(--codigo-fundo); color: var(--codigo-texto);
+      font-family: var(--mono); font-size: 0.8rem; line-height: 1.5; white-space: pre;
+    }
+    .vazio { color: var(--suave); font-style: italic; }
+
+    @media (prefers-reduced-motion: reduce) {
+      button { transition: none; }
+      button:active { transform: none; }
+    }
+
+    @media print {
+      body { background: #fff; }
+      .entrada, .acoes, details.regras, button { display: none !important; }
+      .folha { border: none; box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="pagina">
+    <header>
+      <div>
+        <h1>Placar <span>Web Riddle JS</span></h1>
+      </div>
+      <p id="estado-verificacao" class="estado-verificacao" role="status"></p>
+      <button type="button" class="pequeno" id="botao-bloquear" hidden>Bloquear placar</button>
+    </header>
+
+    <section class="folha" id="cadeado" aria-labelledby="titulo-cadeado" hidden>
+      <h2 id="titulo-cadeado">Placar protegido</h2>
+      <form id="form-senha">
+        <label for="campo-senha">Senha do professor</label>
+        <input id="campo-senha" type="password" autocomplete="current-password" required>
+        <div class="acoes"><button type="submit" class="primario" id="botao-abrir">Abrir placar</button></div>
+      </form>
+      <p id="erro-senha" class="estado-verificacao" data-status="erro" role="alert" hidden></p>
+    </section>
+
+    <main id="conteudo" hidden>
+    <section class="folha entrada" aria-labelledby="titulo-entrada">
+      <h2 id="titulo-entrada">Receber códigos</h2>
+      <label for="campo-codigos">Códigos das duplas</label>
+      <textarea id="campo-codigos" spellcheck="false" autocomplete="off"></textarea>
+      <div class="acoes">
+        <button type="button" class="primario" id="botao-adicionar">Adicionar ao placar</button>
+      </div>
+      <ul class="retornos" id="retornos" aria-live="polite"></ul>
+    </section>
+
+    <section class="folha" aria-labelledby="titulo-placar">
+      <h2 id="titulo-placar">Placar</h2>
+      <details class="regras">
+        <summary>Pontuação</summary>
+        <div class="campos">
+          <div><label for="regra-base">Pontos por fechadura</label><input id="regra-base" type="number" min="0" step="5"></div>
+          <div><label for="regra-dica">Desconto por dica</label><input id="regra-dica" type="number" min="0" step="1"></div>
+          <div><label for="regra-erro">Desconto por erro</label><input id="regra-erro" type="number" min="0" step="1"></div>
+          <div><label for="regra-piso">Piso por fechadura</label><input id="regra-piso" type="number" min="0" step="5"></div>
+          <div><label for="regra-bonus">Bônus de conclusão</label><input id="regra-bonus" type="number" min="0" step="10"></div>
+        </div>
+        <div class="acoes"><button type="button" class="pequeno" id="botao-regras-padrao">Voltar ao padrão</button></div>
+      </details>
+
+      <div class="tabela-rolagem">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">#</th>
+              <th scope="col">Dupla</th>
+              <th scope="col">Fechaduras</th>
+              <th scope="col" class="num">Pontos</th>
+              <th scope="col" class="num">Tempo</th>
+              <th scope="col" class="num">Dicas</th>
+              <th scope="col" class="num">Erros</th>
+              <th scope="col">Situação</th>
+            </tr>
+          </thead>
+          <tbody id="corpo-placar"></tbody>
+        </table>
+      </div>
+      <p id="placar-vazio" class="vazio">Nenhum código ainda.</p>
+      <div class="acoes">
+        <button type="button" id="botao-csv">Exportar CSV</button>
+        <button type="button" id="botao-imprimir">Imprimir</button>
+        <button type="button" class="perigo" id="botao-limpar">Limpar placar</button>
+      </div>
+    </section>
+
+    <section class="folha" aria-labelledby="titulo-detalhes">
+      <h2 id="titulo-detalhes">Detalhamento por dupla</h2>
+      <div id="detalhes"></div>
+    </section>
+    </main>
+  </div>
+
+  <script>
+    // ---------- Progress code (keep in sync with web-riddle-js/app.js) ----------
+
+    const PREFIXO_CODIGO = "WRJS1.";
+    const PIMENTA_SELO = "web-riddle-js|selo|v1";
+    const TAMANHO_SELO = 12;
+    const CHAVE_PLACAR = "web-riddle-js:placar:v1";
+    const REGRAS_PADRAO = { base: 100, dica: 15, erro: 5, piso: 40, bonus: 100 };
+
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+    let verificacao = window.WRJS_VERIFICACAO || null;
+
+    function deBase64Url(texto) {
+      const base64 = texto.replace(/-/g, "+").replace(/_/g, "/");
+      const completo = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+      return Uint8Array.from(atob(completo), (letra) => letra.charCodeAt(0));
+    }
+
+    async function transformar(bytes, fluxo) {
+      const resposta = new Response(new Blob([bytes]).stream().pipeThrough(fluxo));
+      return new Uint8Array(await resposta.arrayBuffer());
+    }
+
+    async function sha256(texto) {
+      return new Uint8Array(await crypto.subtle.digest("SHA-256", encoder.encode(texto)));
+    }
+
+    async function sha256Hex(texto) {
+      return [...(await sha256(texto))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    }
+
+    async function lerCodigoProgresso(codigo) {
+      let pacote;
+      try {
+        pacote = deBase64Url(codigo.slice(PREFIXO_CODIGO.length));
+      } catch (erro) {
+        throw new Error("caracteres inválidos");
+      }
+      let json;
+      try {
+        const conteudo = pacote.slice(1 + TAMANHO_SELO);
+        const corpo = pacote[0] === 1 ? await transformar(conteudo, new DecompressionStream("deflate-raw")) : conteudo;
+        json = decoder.decode(corpo);
+      } catch (erro) {
+        throw new Error("incompleto");
+      }
+      const selo = (await sha256(`${PIMENTA_SELO}|${json}`)).slice(0, TAMANHO_SELO);
+      const recebido = pacote.slice(1, 1 + TAMANHO_SELO);
+      if (!selo.every((byte, i) => byte === recebido[i])) {
+        throw new Error("alterado ou incompleto");
+      }
+      const registro = JSON.parse(json);
+      if (registro.v !== 1 || typeof registro.i !== "number" || !Array.isArray(registro.r)) {
+        throw new Error("versão desconhecida");
+      }
+      return registro;
+    }
+
+    // ---------- Analysis ----------
+
+    function total() {
+      return verificacao ? verificacao.totalFechaduras : 8;
+    }
+
+    function tituloFechadura(i) {
+      return verificacao && verificacao.fechaduras[i] ? verificacao.fechaduras[i].titulo : `Fechadura ${i}`;
+    }
+
+    async function analisar(codigo, recebidoEm) {
+      const registro = await lerCodigoProgresso(codigo);
+      const n = total();
+      const numero = (lista, i) => (Array.isArray(lista) && Number.isFinite(lista[i]) ? lista[i] : 0);
+
+      // Only the unbroken run of answers that match the build hashes counts.
+      let conferidas = 0;
+      let falhaEm = null;
+      if (verificacao) {
+        for (let i = 0; i < Math.min(registro.r.length, n); i++) {
+          const hash = await sha256Hex(`${verificacao.sal}|${i}|${registro.r[i]}`);
+          if (hash !== verificacao.fechaduras[i].hash) {
+            falhaEm = i;
+            break;
+          }
+          conferidas++;
+        }
+      }
+
+      const alertas = [];
+      if (!verificacao) alertas.push("Respostas não conferidas (falta verificacao.js).");
+      if (falhaEm !== null) alertas.push(`Fechadura ${falhaEm}: resposta não confere; as seguintes não contam.`);
+
+      const aberturas = Array.isArray(registro.a) ? registro.a : [];
+      let anterior = 0;
+      let temposOk = true;
+      const fechaduras = [];
+      for (let i = 0; i < n; i++) {
+        const aberta = i < conferidas;
+        const momento = Number.isFinite(aberturas[i]) ? aberturas[i] : null;
+        let duracao = null;
+        if (aberta && momento !== null) {
+          duracao = momento - anterior;
+          if (duracao < 0 || momento > registro.g) temposOk = false;
+          anterior = momento;
+        }
+        fechaduras.push({
+          indice: i,
+          titulo: tituloFechadura(i),
+          aberta,
+          falsa: falhaEm === i,
+          momento,
+          duracao,
+          erros: numero(registro.x, i),
+          dicas: numero(registro.d, i),
+          codigo: Array.isArray(registro.c) && typeof registro.c[i] === "string" ? registro.c[i] : "",
+        });
+      }
+      if (!temposOk) alertas.push("Horários fora de ordem.");
+      if (conferidas === n && !Number.isFinite(registro.f)) alertas.push("Todas conferem, mas falta o horário de fim.");
+      if (aberturas.length && aberturas.slice(0, conferidas).some((valor) => !Number.isFinite(valor))) {
+        alertas.push("Algumas fechaduras estão sem horário.");
+      }
+
+      const concluiu = conferidas === n;
+      const tempo = concluiu && Number.isFinite(registro.f) ? registro.f : registro.g;
+      return {
+        codigo,
+        recebidoEm,
+        equipe: String(registro.e || "(sem nome)").slice(0, 40),
+        inicio: registro.i,
+        gerado: registro.g,
+        tempo,
+        concluiu,
+        conferidas,
+        fechaduras,
+        alertas,
+        codigoFinal: Array.isArray(registro.c) && typeof registro.c[n] === "string" ? registro.c[n] : "",
+      };
+    }
+
+    function pontuar(dupla, regras) {
+      let soma = 0;
+      dupla.fechaduras.forEach((f) => {
+        f.pontos = f.aberta ? Math.max(regras.piso, regras.base - regras.dica * f.dicas - regras.erro * f.erros) : 0;
+        soma += f.pontos;
+      });
+      dupla.bonus = dupla.concluiu ? regras.bonus : 0;
+      dupla.pontos = soma + dupla.bonus;
+      dupla.totalDicas = dupla.fechaduras.reduce((s, f) => s + f.dicas, 0);
+      dupla.totalErros = dupla.fechaduras.reduce((s, f) => s + f.erros, 0);
+    }
+
+    // ---------- Formatting ----------
+
+    function formatarTempo(segundos) {
+      if (!Number.isFinite(segundos)) return "-";
+      const s = Math.max(0, Math.round(segundos));
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const dois = (v) => String(v).padStart(2, "0");
+      return h > 0 ? `${h}:${dois(m)}:${dois(s % 60)}` : `${dois(m)}:${dois(s % 60)}`;
+    }
+
+    function formatarHora(ms) {
+      return new Date(ms).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+    }
+
+    function situacao(dupla) {
+      if (dupla.concluiu) return "Concluiu a trilha";
+      if (dupla.conferidas === 0) return "Ainda na fechadura 0";
+      return `Parou na fechadura ${dupla.conferidas}`;
+    }
+
+    // Builds elements with textContent only: everything in a code was typed by students.
+    function criar(tag, opcoes = {}, ...filhos) {
+      const elemento = document.createElement(tag);
+      if (opcoes.classe) elemento.className = opcoes.classe;
+      if (opcoes.texto !== undefined) elemento.textContent = opcoes.texto;
+      if (opcoes.atributos) Object.entries(opcoes.atributos).forEach(([nome, valor]) => elemento.setAttribute(nome, valor));
+      filhos.filter(Boolean).forEach((filho) => elemento.append(filho));
+      return elemento;
+    }
+
+    // ---------- State ----------
+
+    let recebidos = [];
+    let duplas = [];
+    let regras = { ...REGRAS_PADRAO };
+
+    function carregar() {
+      try {
+        const salvo = JSON.parse(localStorage.getItem(CHAVE_PLACAR) || "{}");
+        recebidos = Array.isArray(salvo.recebidos) ? salvo.recebidos : [];
+        regras = { ...REGRAS_PADRAO, ...(salvo.regras || {}) };
+      } catch (erro) {
+        recebidos = [];
+      }
+    }
+
+    function salvar() {
+      try {
+        localStorage.setItem(CHAVE_PLACAR, JSON.stringify({ recebidos, regras }));
+      } catch (erro) {
+        // Storage blocked: the board still works until the page is closed.
+      }
+    }
+
+    async function reanalisar() {
+      duplas = [];
+      for (const item of recebidos) {
+        try {
+          duplas.push(await analisar(item.codigo, item.recebidoEm));
+        } catch (erro) {
+          // A stored code that no longer decodes is skipped silently.
+        }
+      }
+      // Same start time under different names means one pair copied another's code.
+      const porInicio = new Map();
+      duplas.forEach((dupla) => {
+        const lista = porInicio.get(dupla.inicio) || [];
+        lista.push(dupla);
+        porInicio.set(dupla.inicio, lista);
+      });
+      porInicio.forEach((lista) => {
+        if (lista.length < 2) return;
+        lista.forEach((dupla) => {
+          const outras = lista.filter((outra) => outra !== dupla).map((outra) => outra.equipe).join(", ");
+          dupla.alertas.push(`Mesmo início que ${outras}: código copiado ou restaurado.`);
+        });
+      });
+      renderizar();
+    }
+
+    // ---------- Rendering ----------
+
+    const el = {
+      estado: document.getElementById("estado-verificacao"),
+      campo: document.getElementById("campo-codigos"),
+      adicionar: document.getElementById("botao-adicionar"),
+      retornos: document.getElementById("retornos"),
+      corpo: document.getElementById("corpo-placar"),
+      vazio: document.getElementById("placar-vazio"),
+      detalhes: document.getElementById("detalhes"),
+      csv: document.getElementById("botao-csv"),
+      imprimir: document.getElementById("botao-imprimir"),
+      limpar: document.getElementById("botao-limpar"),
+      padrao: document.getElementById("botao-regras-padrao"),
+    };
+    const camposRegras = {
+      base: document.getElementById("regra-base"),
+      dica: document.getElementById("regra-dica"),
+      erro: document.getElementById("regra-erro"),
+      piso: document.getElementById("regra-piso"),
+      bonus: document.getElementById("regra-bonus"),
+    };
+
+    function ordenar() {
+      duplas.forEach((dupla) => pontuar(dupla, regras));
+      duplas.sort((a, b) => b.pontos - a.pontos || b.conferidas - a.conferidas || a.tempo - b.tempo);
+    }
+
+    function trilhaVisual(dupla) {
+      const trilha = criar("div", { classe: "trilha", atributos: { "aria-hidden": "true" } });
+      dupla.fechaduras.forEach((f) => trilha.append(criar("span", { classe: f.aberta ? "aberta" : f.falsa ? "falsa" : "" })));
+      return trilha;
+    }
+
+    function renderizar() {
+      ordenar();
+      el.corpo.innerHTML = "";
+      el.detalhes.innerHTML = "";
+      el.vazio.hidden = duplas.length > 0;
+
+      duplas.forEach((dupla, posicao) => {
+        const idDetalhe = `dupla-${posicao}`;
+        const nome = criar("a", { texto: dupla.equipe, atributos: { href: `#${idDetalhe}` } });
+        const selo = dupla.alertas.length
+          ? criar("span", { classe: "selo aviso", texto: `${dupla.alertas.length} alerta(s)` })
+          : criar("span", { classe: "selo ok", texto: "conferido" });
+        const linha = criar(
+          "tr",
+          {},
+          criar("td", {}, criar("span", { classe: "posicao", texto: String(posicao + 1) })),
+          criar("td", {}, nome),
+          criar("td", {}, criar("span", { texto: `${dupla.conferidas} de ${total()}` }), trilhaVisual(dupla)),
+          criar("td", { classe: "num" }, criar("span", { classe: "pontos", texto: String(dupla.pontos) })),
+          criar("td", { classe: "num", texto: formatarTempo(dupla.tempo) }),
+          criar("td", { classe: "num", texto: String(dupla.totalDicas) }),
+          criar("td", { classe: "num", texto: String(dupla.totalErros) }),
+          criar("td", {}, criar("div", { texto: situacao(dupla) }), selo),
+        );
+        el.corpo.append(linha);
+        el.detalhes.append(detalheDupla(dupla, posicao, idDetalhe));
+      });
+    }
+
+    function detalheDupla(dupla, posicao, id) {
+      const bloco = criar("details", { classe: "dupla", atributos: { id } });
+      bloco.append(
+        criar(
+          "summary",
+          {},
+          criar("strong", { texto: `${posicao + 1}. ${dupla.equipe}` }),
+          criar("span", { texto: `${dupla.pontos} pontos` }),
+          criar("span", { classe: "nota", texto: situacao(dupla) }),
+        ),
+      );
+
+      const resumo = criar("ul", { classe: "resumo-dupla" });
+      [
+        `Início: ${formatarHora(dupla.inicio)}`,
+        `Código gerado: ${formatarHora(dupla.inicio + dupla.gerado * 1000)}`,
+        `Tempo ${dupla.concluiu ? "total" : "até o código"}: ${formatarTempo(dupla.tempo)}`,
+        `Bônus: ${dupla.bonus}`,
+        `Recebido: ${formatarHora(dupla.recebidoEm)}`,
+      ].forEach((texto) => resumo.append(criar("li", { texto })));
+      bloco.append(resumo);
+
+      if (dupla.alertas.length) {
+        const lista = criar("ul", { classe: "alertas" });
+        dupla.alertas.forEach((texto) => lista.append(criar("li", { texto })));
+        bloco.append(lista);
+      }
+
+      const tabela = criar("table");
+      tabela.append(
+        criar(
+          "thead",
+          {},
+          criar(
+            "tr",
+            {},
+            ...["Fechadura", "Tempo nela", "Aberta aos", "Dicas", "Erros", "Pontos", "Resposta"].map((titulo, i) =>
+              criar("th", { classe: i >= 1 && i <= 5 ? "num" : "", texto: titulo, atributos: { scope: "col" } }),
+            ),
+          ),
+        ),
+      );
+      const corpo = criar("tbody");
+      dupla.fechaduras.forEach((f) => {
+        const emAndamento = !f.aberta && f.indice === dupla.conferidas && !f.falsa;
+        let estado;
+        if (f.aberta) estado = criar("span", { classe: "selo ok", texto: "conferida" });
+        else if (f.falsa) estado = criar("span", { classe: "selo erro", texto: "não confere" });
+        else if (emAndamento) estado = criar("span", { classe: "selo aviso", texto: "em andamento" });
+        else estado = criar("span", { classe: "nota", texto: "não aberta" });
+
+        const tempoNela = f.aberta
+          ? formatarTempo(f.duracao)
+          : emAndamento
+            ? formatarTempo(dupla.gerado - (dupla.fechaduras[f.indice - 1]?.momento ?? 0))
+            : "-";
+        const celulaTitulo = criar("td", {}, criar("div", { texto: f.titulo }));
+        if (f.codigo.trim()) {
+          celulaTitulo.append(
+            criar("details", { classe: "codigo-bancada" }, criar("summary", { texto: "Código da bancada" }), criar("pre", { texto: f.codigo })),
+          );
+        }
+        corpo.append(
+          criar(
+            "tr",
+            {},
+            celulaTitulo,
+            criar("td", { classe: "num", texto: tempoNela }),
+            criar("td", { classe: "num", texto: f.aberta ? formatarTempo(f.momento) : "-" }),
+            criar("td", { classe: "num", texto: String(f.dicas) }),
+            criar("td", { classe: "num", texto: String(f.erros) }),
+            criar("td", { classe: "num", texto: String(f.pontos) }),
+            criar("td", {}, estado),
+          ),
+        );
+      });
+      tabela.append(corpo);
+      bloco.append(criar("div", { classe: "tabela-rolagem" }, tabela));
+
+      if (dupla.codigoFinal.trim()) {
+        bloco.append(
+          criar("details", { classe: "codigo-bancada" }, criar("summary", { texto: "Código da bancada na tela final" }), criar("pre", { texto: dupla.codigoFinal })),
+        );
+      }
+
+      const acoes = criar("div", { classe: "acoes" });
+      const remover = criar("button", { classe: "pequeno perigo", texto: "Remover do placar", atributos: { type: "button" } });
+      remover.addEventListener("click", () => {
+        recebidos = recebidos.filter((item) => item.codigo !== dupla.codigo);
+        salvar();
+        reanalisar();
+      });
+      acoes.append(remover);
+      bloco.append(acoes);
+      return bloco;
+    }
+
+    // ---------- Actions ----------
+
+    function retorno(texto, status) {
+      el.retornos.append(criar("li", { texto, atributos: { "data-status": status } }));
+    }
+
+    async function adicionar() {
+      el.retornos.innerHTML = "";
+      // Chat apps may wrap long codes, so whitespace is dropped and the text is split on the prefix.
+      const codigos = el.campo.value
+        .replace(/\s+/g, "")
+        .split(PREFIXO_CODIGO)
+        .filter(Boolean)
+        .map((parte) => PREFIXO_CODIGO + parte);
+      if (codigos.length === 0) {
+        retorno("Nenhum código encontrado.", "erro");
+        return;
+      }
+      for (const codigo of codigos) {
+        let dupla;
+        try {
+          dupla = await analisar(codigo, Date.now());
+        } catch (erro) {
+          retorno(`Código recusado: ${erro.message}.`, "erro");
+          continue;
+        }
+        if (recebidos.some((item) => item.codigo === codigo)) {
+          retorno(`${dupla.equipe}: este código já está no placar.`, "aviso");
+          continue;
+        }
+        // A newer code from the same pair (same name and start) replaces the older one.
+        const anterior = duplas.find((outra) => outra.inicio === dupla.inicio && outra.equipe === dupla.equipe);
+        if (anterior) {
+          if (anterior.gerado >= dupla.gerado) {
+            retorno(`${dupla.equipe}: o placar já tem um código mais recente desta dupla.`, "aviso");
+            continue;
+          }
+          recebidos = recebidos.filter((item) => item.codigo !== anterior.codigo);
+          retorno(`${dupla.equipe}: código atualizado (${dupla.conferidas} de ${total()} fechaduras).`, "ok");
+        } else {
+          retorno(`${dupla.equipe}: adicionada (${dupla.conferidas} de ${total()} fechaduras).`, "ok");
+        }
+        recebidos.push({ codigo, recebidoEm: dupla.recebidoEm });
+        salvar();
+        await reanalisar();
+      }
+      el.campo.value = "";
+    }
+
+    function exportarCsv() {
+      const n = total();
+      const cabecalho = ["posicao", "dupla", "fechaduras", "pontos", "tempo", "dicas", "erros", "situacao", "alertas"];
+      for (let i = 0; i < n; i++) cabecalho.push(`tempo_f${i}`);
+      const aspas = (valor) => `"${String(valor).replace(/"/g, '""')}"`;
+      const linhas = duplas.map((dupla, posicao) => [
+        posicao + 1,
+        dupla.equipe,
+        dupla.conferidas,
+        dupla.pontos,
+        formatarTempo(dupla.tempo),
+        dupla.totalDicas,
+        dupla.totalErros,
+        situacao(dupla),
+        dupla.alertas.join(" | "),
+        ...dupla.fechaduras.map((f) => (f.aberta ? formatarTempo(f.duracao) : "")),
+      ]);
+      const texto = [cabecalho, ...linhas].map((linha) => linha.map(aspas).join(";")).join("\r\n");
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(new Blob(["﻿" + texto], { type: "text/csv;charset=utf-8" }));
+      link.download = `placar-web-riddle-js-${new Date().toISOString().slice(0, 10)}.csv`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
+
+    let confirmarLimpeza = null;
+    function limpar() {
+      if (!confirmarLimpeza) {
+        el.limpar.textContent = "Clique de novo para apagar";
+        confirmarLimpeza = setTimeout(() => {
+          el.limpar.textContent = "Limpar placar";
+          confirmarLimpeza = null;
+        }, 4000);
+        return;
+      }
+      clearTimeout(confirmarLimpeza);
+      confirmarLimpeza = null;
+      el.limpar.textContent = "Limpar placar";
+      recebidos = [];
+      salvar();
+      el.retornos.innerHTML = "";
+      reanalisar();
+    }
+
+    function preencherRegras() {
+      Object.entries(camposRegras).forEach(([chave, campo]) => {
+        campo.value = regras[chave];
+      });
+    }
+
+    Object.entries(camposRegras).forEach(([chave, campo]) => {
+      campo.addEventListener("input", () => {
+        const valor = Number(campo.value);
+        if (!Number.isFinite(valor) || valor < 0) return;
+        regras[chave] = valor;
+        salvar();
+        renderizar();
+      });
+    });
+
+    el.adicionar.addEventListener("click", adicionar);
+    el.csv.addEventListener("click", exportarCsv);
+    el.imprimir.addEventListener("click", () => window.print());
+    el.limpar.addEventListener("click", limpar);
+    el.padrao.addEventListener("click", () => {
+      regras = { ...REGRAS_PADRAO };
+      preencherRegras();
+      salvar();
+      renderizar();
+    });
+
+    // ---------- Start ----------
+    // Local copy: verificacao.js comes from the script tag. Public copy (web-riddle-js/placar/):
+    // verificacao.json is encrypted with the teacher's passphrase and decrypted here, never stored
+    // in plain files. The decrypted hashes stay in sessionStorage until the tab closes or is locked.
+
+    const CHAVE_SESSAO = "web-riddle-js:placar:verificacao";
+    const cadeado = {
+      secao: document.getElementById("cadeado"),
+      form: document.getElementById("form-senha"),
+      campo: document.getElementById("campo-senha"),
+      botao: document.getElementById("botao-abrir"),
+      erro: document.getElementById("erro-senha"),
+      bloquear: document.getElementById("botao-bloquear"),
+    };
+    const conteudo = document.getElementById("conteudo");
+    let pacoteCifrado = null;
+
+    async function abrirVerificacao(pacote, senha) {
+      const base = await crypto.subtle.importKey("raw", encoder.encode(senha), "PBKDF2", false, ["deriveKey"]);
+      const chave = await crypto.subtle.deriveKey(
+        { name: "PBKDF2", salt: deBase64Url(pacote.salt), iterations: pacote.iteracoes, hash: "SHA-256" },
+        base,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["decrypt"],
+      );
+      const dados = await crypto.subtle.decrypt({ name: "AES-GCM", iv: deBase64Url(pacote.iv) }, chave, deBase64Url(pacote.dados));
+      return JSON.parse(decoder.decode(dados));
+    }
+
+    function iniciarPlacar() {
+      if (verificacao) {
+        el.estado.hidden = true;
+      } else {
+        el.estado.textContent = "verificacao.js não encontrado: rode node fonte/build.mjs.";
+        el.estado.dataset.status = "erro";
+      }
+      conteudo.hidden = false;
+      carregar();
+      preencherRegras();
+      reanalisar();
+    }
+
+    async function iniciar() {
+      if (verificacao) return iniciarPlacar();
+      try {
+        const salvo = JSON.parse(sessionStorage.getItem(CHAVE_SESSAO) || "null");
+        if (salvo && Array.isArray(salvo.fechaduras)) {
+          verificacao = salvo;
+          cadeado.bloquear.hidden = false;
+          return iniciarPlacar();
+        }
+      } catch (erro) {
+        // Storage blocked: ask for the passphrase again.
+      }
+      try {
+        const resposta = await fetch("verificacao.json", { cache: "no-store" });
+        if (!resposta.ok) throw new Error(String(resposta.status));
+        pacoteCifrado = await resposta.json();
+      } catch (erro) {
+        return iniciarPlacar();
+      }
+      el.estado.hidden = true;
+      cadeado.secao.hidden = false;
+      cadeado.campo.focus();
+    }
+
+    cadeado.form.addEventListener("submit", async (evento) => {
+      evento.preventDefault();
+      cadeado.erro.hidden = true;
+      cadeado.botao.disabled = true;
+      cadeado.botao.textContent = "Conferindo...";
+      let aberta = null;
+      try {
+        aberta = await abrirVerificacao(pacoteCifrado, cadeado.campo.value);
+      } catch (erro) {
+        // AES-GCM rejects a wrong key, so a wrong passphrase lands here.
+      }
+      cadeado.botao.disabled = false;
+      cadeado.botao.textContent = "Abrir placar";
+      if (!aberta || !Array.isArray(aberta.fechaduras)) {
+        cadeado.erro.textContent = "Senha incorreta. Confira maiúsculas, acentos e espaços.";
+        cadeado.erro.hidden = false;
+        cadeado.campo.select();
+        return;
+      }
+      cadeado.campo.value = "";
+      verificacao = aberta;
+      try {
+        sessionStorage.setItem(CHAVE_SESSAO, JSON.stringify(aberta));
+      } catch (erro) {
+        // Storage blocked: the passphrase will be asked again after a reload.
+      }
+      cadeado.secao.hidden = true;
+      cadeado.bloquear.hidden = false;
+      iniciarPlacar();
+      el.campo.focus();
+    });
+
+    cadeado.bloquear.addEventListener("click", () => {
+      try {
+        sessionStorage.removeItem(CHAVE_SESSAO);
+      } catch (erro) {
+        // Nothing stored.
+      }
+      location.reload();
+    });
+
+    iniciar();
+  </script>
+</body>
+</html>

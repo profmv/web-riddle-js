@@ -612,6 +612,94 @@ main {
   overflow-wrap: anywhere;
 }
 
+/* Glossary: a term is a small button that opens an explanation balloon. */
+.termo {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px dotted currentColor;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  cursor: help;
+}
+
+.termo:hover,
+.termo[aria-expanded="true"] {
+  color: var(--latao-texto);
+  border-bottom-style: solid;
+}
+
+.termo:focus-visible {
+  outline: 2px solid var(--latao);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.balao {
+  position: fixed;
+  inset: auto;
+  z-index: 50;
+  display: block;
+  width: max-content;
+  max-width: min(320px, 100vw - 32px);
+  margin: 0;
+  padding: 12px 14px;
+  overflow: visible;
+  border: 1px solid var(--borda-forte);
+  border-radius: var(--raio);
+  background: var(--cartao);
+  box-shadow: var(--sombra);
+  color: var(--texto);
+  font-family: var(--fonte-texto);
+  font-size: 0.88rem;
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: normal;
+  opacity: 0;
+  transform: translateY(4px) scale(0.97);
+  transform-origin: top left;
+  transition: opacity 160ms var(--facil), transform 160ms var(--facil);
+}
+
+.balao[data-lado="cima"] {
+  transform: translateY(-4px) scale(0.97);
+  transform-origin: bottom left;
+}
+
+.balao.visivel {
+  opacity: 1;
+  transform: none;
+}
+
+.balao-titulo {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--latao-texto);
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.balao-linha {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--suave);
+}
+
+.balao-linha strong {
+  color: var(--texto);
+}
+
+.balao a {
+  color: var(--latao-texto);
+  font-weight: 700;
+}
+
 pre {
   margin: 12px 0;
   padding: 14px 16px;
