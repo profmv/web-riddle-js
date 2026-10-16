@@ -559,6 +559,95 @@ input:disabled {
   margin: 4px 0 0;
 }
 
+/* ---------- Progress code ---------- */
+
+.restaurar {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--borda);
+}
+
+.restaurar summary {
+  cursor: pointer;
+  color: var(--suave);
+}
+
+.restaurar form {
+  margin-top: 10px;
+}
+
+.painel-codigo h3 {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+}
+
+.painel-codigo {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 2px solid var(--destaque);
+  border-radius: var(--raio);
+  background: var(--destaque-suave);
+}
+
+.painel-codigo p {
+  margin: 0 0 10px;
+}
+
+#app-codigo-progresso,
+#app-codigo-restaurar {
+  width: 100%;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  word-break: break-all;
+  resize: vertical;
+}
+
+#app-codigo-progresso {
+  margin-bottom: 8px;
+  background: var(--cartao);
+}
+
+/* ---------- Fill-in-the-blank code (lock 0) ---------- */
+
+.lacuna {
+  padding: 0 3px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+.lacuna-troca {
+  color: #ff6b5f;
+  text-decoration: underline wavy #ff6b5f;
+  text-underline-offset: 4px;
+}
+
+.lacuna-vazia {
+  border: 2px dashed #e0a640;
+  color: #e0a640;
+}
+
+.legenda-lacunas {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.legenda-lacunas li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: start;
+}
+
+.legenda-lacunas .lacuna {
+  padding: 1px 6px;
+  background: var(--codigo-fundo);
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}
+
 .mensagem[data-status="error"] {
   padding: 8px 12px;
   border-radius: 6px;
@@ -665,9 +754,3 @@ input:disabled {
 
 /* ---------- Footer ---------- */
 
-.rodape {
-  padding: 16px clamp(16px, 4vw, 40px) 32px;
-  color: var(--suave);
-  font-size: 0.85rem;
-  text-align: center;
-}

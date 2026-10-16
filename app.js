@@ -31,6 +31,15 @@ const el = {
   saida: document.getElementById("app-saida"),
   mochila: document.getElementById("app-mochila"),
   carregando: document.getElementById("app-carregando"),
+  formRestaurar: document.getElementById("app-form-restaurar"),
+  codigoRestaurar: document.getElementById("app-codigo-restaurar"),
+  mensagemRestaurar: document.getElementById("app-mensagem-restaurar"),
+  gerarCodigo: document.getElementById("app-gerar-codigo"),
+  painelCodigo: document.getElementById("app-painel-codigo"),
+  textoPainelCodigo: document.getElementById("app-texto-painel-codigo"),
+  codigoProgresso: document.getElementById("app-codigo-progresso"),
+  copiarCodigo: document.getElementById("app-copiar-codigo"),
+  statusCopia: document.getElementById("app-status-copia"),
 };
 
 let dados = null;
@@ -39,7 +48,7 @@ let etapasAbertas = [];
 let atual = 0;
 
 function estadoVazio() {
-  return { equipe: "", inicio: null, fim: null, respostas: [], erros: {}, dicas: {}, codigos: {} };
+  return { equipe: "", inicio: null, fim: null, respostas: [], aberturas: {}, erros: {}, dicas: {}, codigos: {} };
 }
 
 // ---------- Storage ----------
@@ -100,6 +109,125 @@ async function decifrar(indice, senha) {
 async function sha256Hex(texto) {
   const hash = await crypto.subtle.digest("SHA-256", encoder.encode(texto));
   return [...new Uint8Array(hash)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+// ---------- Progress code ----------
+// A portable snapshot of the trail: team, times, answers, errors, hints and
+// workbench code. It restores progress on another browser and is what the
+// pair sends to the teacher. Format: "WRJS1." + base64url(flag + seal + body).
+// The seal only catches accidental edits; anyone reading this file can forge
+// one. The teacher page checks the answers themselves, which cannot be faked
+// without solving the locks. Keep this block in sync with professor/placar.html.
+
+const PREFIXO_CODIGO = "WRJS1.";
+const PIMENTA_SELO = "web-riddle-js|selo|v1";
+const TAMANHO_SELO = 12;
+const LIMITE_CODIGO_BANCADA = 4000;
+
+function paraBase64Url(bytes) {
+  let binario = "";
+  bytes.forEach((byte) => {
+    binario += String.fromCharCode(byte);
+  });
+  return btoa(binario).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function deBase64Url(texto) {
+  const base64 = texto.replace(/-/g, "+").replace(/_/g, "/");
+  return deBase64(base64 + "=".repeat((4 - (base64.length % 4)) % 4));
+}
+
+async function transformar(bytes, fluxo) {
+  const resposta = new Response(new Blob([bytes]).stream().pipeThrough(fluxo));
+  return new Uint8Array(await resposta.arrayBuffer());
+}
+
+async function calcularSelo(json) {
+  const hash = await crypto.subtle.digest("SHA-256", encoder.encode(`${PIMENTA_SELO}|${json}`));
+  return new Uint8Array(hash).slice(0, TAMANHO_SELO);
+}
+
+function segundosDesdeInicio(momento) {
+  return typeof momento === "number" ? Math.round((momento - estado.inicio) / 1000) : null;
+}
+
+function montarRegistro() {
+  const total = totalFechaduras();
+  const porFechadura = (objeto) => Array.from({ length: total }, (_, i) => objeto[i] || 0);
+  return {
+    v: 1,
+    e: estado.equipe,
+    i: estado.inicio,
+    f: segundosDesdeInicio(estado.fim),
+    g: segundosDesdeInicio(Date.now()),
+    r: estado.respostas,
+    a: estado.respostas.map((_, i) => segundosDesdeInicio(estado.aberturas[i])),
+    x: porFechadura(estado.erros),
+    d: porFechadura(estado.dicas),
+    c: Array.from({ length: total + 1 }, (_, i) => String(estado.codigos[i] || "").slice(0, LIMITE_CODIGO_BANCADA)),
+  };
+}
+
+async function gerarCodigoProgresso() {
+  const json = JSON.stringify(montarRegistro());
+  const corpo = encoder.encode(json);
+  const compactar = typeof CompressionStream === "function";
+  const conteudo = compactar ? await transformar(corpo, new CompressionStream("deflate-raw")) : corpo;
+  const pacote = new Uint8Array(1 + TAMANHO_SELO + conteudo.length);
+  pacote[0] = compactar ? 1 : 0;
+  pacote.set(await calcularSelo(json), 1);
+  pacote.set(conteudo, 1 + TAMANHO_SELO);
+  return PREFIXO_CODIGO + paraBase64Url(pacote);
+}
+
+// Returns the decoded record, or throws an Error with a message for the pair.
+async function lerCodigoProgresso(texto) {
+  const limpo = String(texto).replace(/\s+/g, "");
+  if (!limpo.startsWith(PREFIXO_CODIGO)) {
+    throw new Error("Este não é um código de progresso.");
+  }
+  let pacote;
+  try {
+    pacote = deBase64Url(limpo.slice(PREFIXO_CODIGO.length));
+  } catch (erro) {
+    throw new Error("Código inválido. Copiem de novo, completo.");
+  }
+  let json;
+  try {
+    const conteudo = pacote.slice(1 + TAMANHO_SELO);
+    const corpo = pacote[0] === 1 ? await transformar(conteudo, new DecompressionStream("deflate-raw")) : conteudo;
+    json = decoder.decode(corpo);
+  } catch (erro) {
+    throw new Error("Código incompleto. Copiem de novo, completo.");
+  }
+  const selo = await calcularSelo(json);
+  const seloRecebido = pacote.slice(1, 1 + TAMANHO_SELO);
+  if (!selo.every((byte, i) => byte === seloRecebido[i])) {
+    throw new Error("Código alterado ou incompleto.");
+  }
+  return JSON.parse(json);
+}
+
+function estadoDoRegistro(registro) {
+  const novo = estadoVazio();
+  const momento = (segundos) => (typeof segundos === "number" ? registro.i + segundos * 1000 : null);
+  novo.equipe = String(registro.e || "").slice(0, 30);
+  novo.inicio = registro.i;
+  novo.fim = momento(registro.f);
+  novo.respostas = (registro.r || []).map(String);
+  (registro.a || []).forEach((segundos, i) => {
+    if (typeof segundos === "number") novo.aberturas[i] = momento(segundos);
+  });
+  (registro.x || []).forEach((valor, i) => {
+    if (valor) novo.erros[i] = valor;
+  });
+  (registro.d || []).forEach((valor, i) => {
+    if (valor) novo.dicas[i] = valor;
+  });
+  (registro.c || []).forEach((codigo, i) => {
+    if (codigo) novo.codigos[i] = codigo;
+  });
+  return novo;
 }
 
 // ---------- Workbench (bancada) ----------
@@ -170,7 +298,7 @@ function executarCodigo() {
   salvarCodigo();
   const codigo = el.codigo.value;
   if (codigo.trim() === "") {
-    escreverSaida("A bancada está vazia. Escrevam algum código antes de executar.", "info");
+    escreverSaida("A bancada está vazia.", "info");
     return;
   }
   escreverSaida("> executando...", "info");
@@ -373,6 +501,74 @@ function renderizar() {
   el.codigo.value = estado.codigos[atual] || "";
   renderizarProgresso();
   renderizarMochila();
+
+  // The final screen always shows the code to send; elsewhere it stays open
+  // only if the pair asked for it, and is refreshed so it is never stale.
+  if (ehFinal || !el.painelCodigo.hidden) {
+    mostrarPainelCodigo();
+  }
+}
+
+async function mostrarPainelCodigo() {
+  salvarCodigo();
+  const ehFinal = atual === totalFechaduras();
+  el.textoPainelCodigo.textContent = ehFinal
+    ? "Enviem este código ao professor."
+    : `${estado.respostas.length} de ${totalFechaduras()} fechaduras. Usem para continuar em outro computador ou para entregar ao professor.`;
+  el.statusCopia.textContent = "";
+  el.painelCodigo.hidden = false;
+  el.gerarCodigo.hidden = true;
+  el.codigoProgresso.value = "Gerando...";
+  try {
+    el.codigoProgresso.value = await gerarCodigoProgresso();
+  } catch (erro) {
+    logOriginal("Falha ao gerar o código", erro);
+    el.codigoProgresso.value = "";
+    el.statusCopia.textContent = "Não foi possível gerar o código. Avisem o professor.";
+  }
+}
+
+async function copiarCodigoProgresso() {
+  const codigo = el.codigoProgresso.value;
+  try {
+    await navigator.clipboard.writeText(codigo);
+    el.statusCopia.textContent = "Copiado.";
+  } catch (erro) {
+    // Clipboard may be blocked: select the text so Ctrl + C works.
+    el.codigoProgresso.focus();
+    el.codigoProgresso.select();
+    el.statusCopia.textContent = "Usem Ctrl + C para copiar.";
+  }
+}
+
+async function restaurarProgresso(evento) {
+  evento.preventDefault();
+  const texto = el.codigoRestaurar.value;
+  const avisar = (mensagem, status) => {
+    el.mensagemRestaurar.textContent = mensagem;
+    el.mensagemRestaurar.dataset.status = status;
+  };
+  if (texto.trim() === "") {
+    avisar("Colem o código primeiro.", "error");
+    el.codigoRestaurar.focus();
+    return;
+  }
+  let registro;
+  try {
+    registro = await lerCodigoProgresso(texto);
+  } catch (erro) {
+    avisar(erro.message, "error");
+    return;
+  }
+  if (registro.v !== 1 || !registro.e || typeof registro.i !== "number") {
+    avisar("Este código é de outra versão da trilha.", "error");
+    return;
+  }
+  avisar("Carregando...", "info");
+  estado = estadoDoRegistro(registro);
+  salvarEstado();
+  await iniciarTrilha();
+  escreverSaida(`Bem-vindos de volta, ${estado.equipe}.`, "sucesso");
 }
 
 function mostrarMensagem(texto, status, comoHtml) {
@@ -406,6 +602,7 @@ async function tentarAbrir(evento) {
   if (proxima) {
     salvarCodigo();
     estado.respostas[indice] = tentativa;
+    estado.aberturas[indice] = Date.now();
     etapasAbertas[indice + 1] = proxima;
     if (indice + 1 === totalFechaduras()) {
       estado.fim = Date.now();
@@ -434,7 +631,7 @@ async function tentarAbrir(evento) {
 async function iniciarTrilha() {
   el.boasVindas.hidden = true;
   el.carregando.hidden = false;
-  el.carregando.textContent = "Abrindo as fechaduras já resolvidas...";
+  el.carregando.textContent = "Carregando a trilha...";
 
   etapasAbertas = [];
   const primeira = await decifrar(0, "");
@@ -525,9 +722,12 @@ el.limpar.addEventListener("click", () => {
 el.reiniciarEtapa.addEventListener("click", () => {
   salvarCodigo();
   renderizar();
-  escreverSaida("Etapa reiniciada: a página da fechadura foi recriada, sem ouvintes antigos.", "info");
+  escreverSaida("Etapa reiniciada.", "info");
 });
 el.baixar.addEventListener("click", baixarCodigo);
+el.formRestaurar.addEventListener("submit", restaurarProgresso);
+el.gerarCodigo.addEventListener("click", mostrarPainelCodigo);
+el.copiarCodigo.addEventListener("click", copiarCodigoProgresso);
 el.recomecar.addEventListener("click", recomecar);
 
 el.codigo.addEventListener("input", () => {
@@ -560,14 +760,14 @@ setInterval(atualizarTempo, 1000);
 
 async function iniciar() {
   if (!window.crypto || !crypto.subtle) {
-    el.carregando.textContent = "Este navegador não liberou a criptografia da página. Abram a trilha pelo endereço https publicado.";
+    el.carregando.textContent = "Não foi possível abrir a trilha. Usem o endereço https da atividade.";
     return;
   }
   try {
     const resposta = await fetch("etapas.json", { cache: "no-store" });
     dados = await resposta.json();
   } catch (erro) {
-    el.carregando.textContent = "Não foi possível carregar a trilha. Abram a página pelo endereço publicado (https), não pelo arquivo local.";
+    el.carregando.textContent = "Não foi possível carregar a trilha. Usem o endereço https da atividade.";
     return;
   }
 

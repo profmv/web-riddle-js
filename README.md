@@ -8,9 +8,9 @@ Acesse: https://profmv.github.io/web-riddle-js/
 
 ## Como funciona
 
-- Informe o nome da dupla (use o primeiro nome ou um nome fictício) e comece pela fechadura 0.
+- Informe um apelido para a dupla e comece pela fechadura 0.
 - Resolva cada enigma na bancada da página, no console do navegador (F12) ou no VS Code, quando o enunciado pedir.
-- O progresso fica salvo apenas neste navegador; nada é enviado a servidor.
+- O progresso fica salvo no navegador. O código de progresso permite continuar em outro computador e é o que a dupla entrega ao professor.
 - Cada fechadura está cifrada com a resposta da anterior, por isso este repositório não mostra as fechaduras seguintes nem as respostas.
 
 ## Executar localmente

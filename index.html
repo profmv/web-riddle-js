@@ -27,19 +27,26 @@
   <main id="app-principal">
     <section class="cartao boas-vindas" id="app-boas-vindas" hidden>
       <h2>Antes de começar</h2>
-      <p>Esta trilha é resolvida <strong>em dupla</strong>. Cada fechadura traz um desafio que só se resolve com JavaScript. A resposta de uma fechadura é a chave da próxima.</p>
-      <ul>
-        <li>Quem digita é o <strong>piloto</strong>; quem lê o enunciado e confere é o <strong>navegador</strong>. Troquem a cada fechadura.</li>
-        <li>As dicas ajudam, mas ficam registradas.</li>
-        <li>O progresso fica salvo neste navegador.</li>
-      </ul>
+      <p>Em dupla: um digita, o outro lê e confere. Troquem a cada fechadura. A resposta de uma fechadura abre a próxima.</p>
       <form id="app-form-equipe" class="linha-form">
-        <label for="app-nome-equipe">Nome da dupla <span class="nota">(apelido; não use nome completo)</span></label>
+        <label for="app-nome-equipe">Nome da dupla <span class="nota">(apelido)</span></label>
         <div class="linha">
           <input id="app-nome-equipe" maxlength="30" autocomplete="off" required>
           <button type="submit" class="botao primario">Começar a trilha</button>
         </div>
       </form>
+
+      <details class="restaurar">
+        <summary>Continuar com um código</summary>
+      <form id="app-form-restaurar" class="linha-form">
+        <label for="app-codigo-restaurar" class="visualmente-oculto">Código de progresso</label>
+        <textarea id="app-codigo-restaurar" rows="3" spellcheck="false" autocomplete="off"></textarea>
+        <div class="linha">
+          <button type="submit" class="botao">Continuar</button>
+        </div>
+        <p id="app-mensagem-restaurar" class="mensagem" role="status"></p>
+      </form>
+      </details>
     </section>
 
     <div class="grade" id="app-grade" hidden>
@@ -60,8 +67,20 @@
         <div class="acoes-etapa">
           <button type="button" class="botao" id="app-reiniciar-etapa">Reiniciar etapa</button>
           <button type="button" class="botao" id="app-baixar">Baixar nosso código</button>
+          <button type="button" class="botao" id="app-gerar-codigo">Código de progresso</button>
           <button type="button" class="botao perigo" id="app-recomecar">Recomeçar a trilha</button>
         </div>
+
+        <section class="painel-codigo" id="app-painel-codigo" aria-labelledby="app-titulo-painel-codigo" hidden>
+          <h3 id="app-titulo-painel-codigo">Código de progresso</h3>
+          <p id="app-texto-painel-codigo"></p>
+          <label for="app-codigo-progresso" class="visualmente-oculto">Código de progresso</label>
+          <textarea id="app-codigo-progresso" rows="4" readonly spellcheck="false"></textarea>
+          <div class="linha">
+            <button type="button" class="botao primario" id="app-copiar-codigo">Copiar código</button>
+          </div>
+          <p id="app-status-copia" class="nota" role="status"></p>
+        </section>
       </section>
 
       <aside class="lateral">
@@ -89,10 +108,6 @@
 
     <p id="app-carregando" class="carregando">Carregando a trilha...</p>
   </main>
-
-  <footer class="rodape">
-    <p>Atividade didática de JavaScript. Nenhum dado sai deste navegador.</p>
-  </footer>
 
   <script src="app.js"></script>
 </body>
