@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Web Riddle JS</title>
+  <meta name="description" content="Trilha de enigmas em JavaScript para resolver em dupla: cada fechadura guarda a pista da próxima.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topo">
+    <div class="topo-marca">
+      <span class="logo" aria-hidden="true">{ }</span>
+      <div>
+        <h1>Web Riddle JS</h1>
+        <p class="subtitulo">A trilha das sete fechaduras</p>
+      </div>
+    </div>
+    <div class="topo-info" id="app-topo-info" hidden>
+      <span>Dupla: <strong id="app-equipe"></strong></span>
+      <span>Tempo: <strong id="app-tempo">00:00</strong></span>
+    </div>
+  </header>
+
+  <nav class="progresso" id="app-progresso" aria-label="Fechaduras" hidden></nav>
+
+  <main id="app-principal">
+    <section class="cartao boas-vindas" id="app-boas-vindas" hidden>
+      <h2>Antes de começar</h2>
+      <p>Esta trilha é resolvida <strong>em dupla</strong>. Cada fechadura traz um desafio que só se resolve com JavaScript. A resposta de uma fechadura é a chave da próxima.</p>
+      <ul>
+        <li>Quem digita é o <strong>piloto</strong>; quem lê o enunciado e confere é o <strong>navegador</strong>. Troquem a cada fechadura.</li>
+        <li>As dicas ajudam, mas ficam registradas.</li>
+        <li>O progresso fica salvo neste navegador.</li>
+      </ul>
+      <form id="app-form-equipe" class="linha-form">
+        <label for="app-nome-equipe">Nome da dupla <span class="nota">(apelido; não use nome completo)</span></label>
+        <div class="linha">
+          <input id="app-nome-equipe" maxlength="30" autocomplete="off" required>
+          <button type="submit" class="botao primario">Começar a trilha</button>
+        </div>
+      </form>
+    </section>
+
+    <div class="grade" id="app-grade" hidden>
+      <section class="cartao etapa" aria-live="polite">
+        <div id="app-etapa"></div>
+
+        <div class="dicas" id="app-dicas"></div>
+
+        <form id="app-form-resposta" class="linha-form resposta">
+          <label for="app-resposta">Pista desta fechadura</label>
+          <div class="linha">
+            <input id="app-resposta" autocomplete="off" spellcheck="false">
+            <button type="submit" class="botao primario" id="app-botao-abrir">Abrir fechadura</button>
+          </div>
+          <p id="app-mensagem" class="mensagem" role="status"></p>
+        </form>
+
+        <div class="acoes-etapa">
+          <button type="button" class="botao" id="app-reiniciar-etapa">Reiniciar etapa</button>
+          <button type="button" class="botao" id="app-baixar">Baixar nosso código</button>
+          <button type="button" class="botao perigo" id="app-recomecar">Recomeçar a trilha</button>
+        </div>
+      </section>
+
+      <aside class="lateral">
+        <section class="cartao bancada">
+          <div class="bancada-topo">
+            <h2>Bancada</h2>
+            <span class="nota">Ctrl + Enter executa</span>
+          </div>
+          <label for="app-codigo" class="visualmente-oculto">Código JavaScript</label>
+          <textarea id="app-codigo" spellcheck="false" autocomplete="off" placeholder="// escreva seu código aqui&#10;console.log(&quot;olá&quot;);"></textarea>
+          <div class="linha">
+            <button type="button" class="botao primario" id="app-executar">Executar</button>
+            <button type="button" class="botao" id="app-limpar">Limpar saída</button>
+          </div>
+          <h3 class="saida-titulo">Saída</h3>
+          <div id="app-saida" class="saida" aria-live="polite"></div>
+        </section>
+
+        <section class="cartao mochila">
+          <h2>Mochila de pistas</h2>
+          <ol id="app-mochila"></ol>
+        </section>
+      </aside>
+    </div>
+
+    <p id="app-carregando" class="carregando">Carregando a trilha...</p>
+  </main>
+
+  <footer class="rodape">
+    <p>Atividade didática de JavaScript. Nenhum dado sai deste navegador.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
