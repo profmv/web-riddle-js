@@ -16,6 +16,8 @@ const el = {
   formEquipe: document.getElementById("app-form-equipe"),
   nomeEquipe: document.getElementById("app-nome-equipe"),
   grade: document.getElementById("app-grade"),
+  cartaoEtapa: document.getElementById("app-cartao-etapa"),
+  linhaResposta: document.getElementById("app-linha-resposta"),
   etapa: document.getElementById("app-etapa"),
   dicas: document.getElementById("app-dicas"),
   formResposta: document.getElementById("app-form-resposta"),
@@ -325,6 +327,16 @@ function salvarCodigo() {
 
 // ---------- Rendering ----------
 
+// Icon per lock index (Tabler sprite in index.html); the last entry is the final screen.
+const ICONES_FECHADURA = ["door", "settings", "route", "gauge", "note", "calculator", "robot", "shield-lock", "trophy"];
+
+function icone(nome) {
+  return `<svg class="icone" aria-hidden="true"><use href="#i-${nome}"/></svg>`;
+}
+
+// Index of a lock opened a moment ago, so the next render can animate it once.
+let recemAberta = null;
+
 function totalFechaduras() {
   return dados.totalFechaduras;
 }
@@ -357,14 +369,23 @@ function somarValores(objeto) {
 function renderizarProgresso() {
   el.progresso.innerHTML = "";
   for (let i = 0; i <= totalFechaduras(); i++) {
+    const ehFinal = i === totalFechaduras();
+    const aberta = i <= maiorAberta();
+    const resolvida = i < maiorAberta();
+    if (i > 0) {
+      const elo = document.createElement("span");
+      elo.className = aberta ? "elo feito" : "elo";
+      elo.setAttribute("aria-hidden", "true");
+      el.progresso.append(elo);
+    }
     const botao = document.createElement("button");
     botao.type = "button";
     botao.className = "passo";
-    const ehFinal = i === totalFechaduras();
-    botao.textContent = ehFinal ? "Fim" : String(i);
-    const aberta = i <= maiorAberta();
-    const resolvida = i < maiorAberta();
+    let nomeIcone = resolvida ? "lock-open" : aberta ? "key" : "lock";
+    if (ehFinal) nomeIcone = aberta ? "trophy" : "flag";
+    botao.innerHTML = `<span class="passo-anel">${icone(nomeIcone)}</span><span class="passo-num">${ehFinal ? "Fim" : i}</span>`;
     if (resolvida) botao.classList.add("resolvida");
+    if (recemAberta !== null && i === recemAberta) botao.classList.add("estalo");
     if (i === atual) {
       botao.classList.add("atual");
       botao.setAttribute("aria-current", "step");
@@ -395,8 +416,9 @@ function renderizarMochila() {
   estado.respostas.forEach((resposta, i) => {
     const item = document.createElement("li");
     item.value = i;
+    item.innerHTML = icone("key");
     const rotulo = document.createElement("span");
-    rotulo.textContent = `Fechadura ${i}: `;
+    rotulo.textContent = `Fechadura ${i}`;
     const valor = document.createElement("code");
     valor.textContent = resposta;
     item.append(rotulo, valor);
@@ -404,7 +426,7 @@ function renderizarMochila() {
   });
 }
 
-function renderizarDicas(etapa) {
+function renderizarDicas(etapa, revelada) {
   el.dicas.innerHTML = "";
   if (!etapa.dicas || etapa.dicas.length === 0) return;
   const usadas = estado.dicas[atual] || 0;
@@ -412,8 +434,8 @@ function renderizarDicas(etapa) {
   etapa.dicas.forEach((dica, i) => {
     if (i < usadas) {
       const bloco = document.createElement("div");
-      bloco.className = "dica";
-      bloco.innerHTML = `<p class="dica-titulo">Dica ${i + 1}</p>${dica}`;
+      bloco.className = i === revelada ? "dica nova" : "dica";
+      bloco.innerHTML = `<p class="dica-titulo">${icone("bulb")}Dica ${i + 1}</p>${dica}`;
       el.dicas.append(bloco);
     }
   });
@@ -422,11 +444,11 @@ function renderizarDicas(etapa) {
     const botao = document.createElement("button");
     botao.type = "button";
     botao.className = "botao";
-    botao.textContent = `Ver dica ${usadas + 1} de ${etapa.dicas.length}`;
+    botao.innerHTML = `${icone("bulb")}<span>Ver dica ${usadas + 1} de ${etapa.dicas.length}</span>`;
     botao.addEventListener("click", () => {
       estado.dicas[atual] = usadas + 1;
       salvarEstado();
-      renderizarDicas(etapa);
+      renderizarDicas(etapa, usadas);
     });
     el.dicas.append(botao);
   }
@@ -468,8 +490,13 @@ function renderizar() {
   const resolvida = atual < maiorAberta();
 
   el.etapa.innerHTML = `
-    <p class="rotulo">${ehFinal ? "Trilha concluída" : `Fechadura ${atual} de ${totalFechaduras() - 1}`}</p>
-    <h2 id="app-titulo-etapa" tabindex="-1">${etapa.titulo}</h2>
+    <div class="etapa-cabeca">
+      <span class="placa" aria-hidden="true">${icone(ICONES_FECHADURA[atual] || "lock")}${ehFinal ? "" : `<span class="placa-num">${atual}</span>`}</span>
+      <div>
+        <p class="rotulo">${ehFinal ? "Trilha concluída" : `Fechadura ${atual} de ${totalFechaduras() - 1}`}</p>
+        <h2 id="app-titulo-etapa" tabindex="-1">${etapa.titulo}</h2>
+      </div>
+    </div>
     ${etapa.conceitos.length ? `<ul class="conceitos">${etapa.conceitos.map((c) => `<li>${c}</li>`).join("")}</ul>` : ""}
     <div class="historia">${etapa.historia}</div>
     <div class="desafio">${etapa.desafio}</div>`;
@@ -501,6 +528,9 @@ function renderizar() {
   el.codigo.value = estado.codigos[atual] || "";
   renderizarProgresso();
   renderizarMochila();
+
+  el.cartaoEtapa.classList.toggle("recem-aberta", recemAberta !== null);
+  recemAberta = null;
 
   // The final screen always shows the code to send; elsewhere it stays open
   // only if the pair asked for it, and is refreshed so it is never stale.
@@ -580,6 +610,13 @@ function mostrarMensagem(texto, status, comoHtml) {
   el.mensagem.dataset.status = status;
 }
 
+// Restart the CSS shake even when two wrong answers come in a row.
+function tremer(elemento) {
+  elemento.classList.remove("treme");
+  void elemento.offsetWidth;
+  elemento.classList.add("treme");
+}
+
 // ---------- Flow ----------
 
 async function tentarAbrir(evento) {
@@ -609,6 +646,7 @@ async function tentarAbrir(evento) {
     }
     salvarEstado();
     atual = indice + 1;
+    recemAberta = indice;
     renderizar();
     escreverSaida(`Fechadura ${indice} aberta!`, "sucesso");
     document.getElementById("app-titulo-etapa").focus();
@@ -617,6 +655,7 @@ async function tentarAbrir(evento) {
 
   estado.erros[indice] = (estado.erros[indice] || 0) + 1;
   salvarEstado();
+  tremer(el.linhaResposta);
 
   const etapa = etapasAbertas[indice];
   const hash = await sha256Hex(`${etapa.tag}|${tentativa}`);
@@ -681,10 +720,11 @@ function baixarCodigo() {
 let confirmarRecomeco = null;
 
 function recomecar() {
+  const texto = el.recomecar.querySelector("span");
   if (!confirmarRecomeco) {
-    el.recomecar.textContent = "Clique de novo para apagar tudo";
+    texto.textContent = "Clique de novo para apagar tudo";
     confirmarRecomeco = setTimeout(() => {
-      el.recomecar.textContent = "Recomeçar a trilha";
+      texto.textContent = "Recomeçar a trilha";
       confirmarRecomeco = null;
     }, 4000);
     return;

@@ -5,20 +5,55 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Web Riddle JS</title>
   <meta name="description" content="Trilha de enigmas em JavaScript para resolver em dupla: cada fechadura guarda a pista da próxima.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;700&family=Big+Shoulders+Stencil:wght@700;800&family=JetBrains+Mono:wght@400;600&display=swap">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <svg class="sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-alert-triangle" viewBox="0 0 24 24"><path d="M12 9v4"/><path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0z"/><path d="M12 16h.01"/></symbol>
+  <symbol id="i-arrow-back-up" viewBox="0 0 24 24"><path d="M9 14l-4 -4l4 -4"/><path d="M5 10h11a4 4 0 1 1 0 8h-1"/></symbol>
+  <symbol id="i-backpack" viewBox="0 0 24 24"><path d="M5 18v-6a6 6 0 0 1 6 -6h2a6 6 0 0 1 6 6v6a3 3 0 0 1 -3 3h-8a3 3 0 0 1 -3 -3z"/><path d="M10 6v-1a2 2 0 1 1 4 0v1"/><path d="M9 21v-4a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v4"/><path d="M11 10h2"/></symbol>
+  <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M3 12h1m8 -9v1m8 8h1m-15.4 -6.4l.7 .7m12.1 -.7l-.7 .7"/><path d="M9 16a5 5 0 1 1 6 0a3.5 3.5 0 0 0 -1 3a2 2 0 0 1 -4 0a3.5 3.5 0 0 0 -1 -3"/><path d="M9.7 17l4.6 0"/></symbol>
+  <symbol id="i-calculator" viewBox="0 0 24 24"><path d="M4 3m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z"/><path d="M8 7m0 1a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1v1a1 1 0 0 1 -1 1h-6a1 1 0 0 1 -1 -1z"/><path d="M8 14l0 .01"/><path d="M12 14l0 .01"/><path d="M16 14l0 .01"/><path d="M8 17l0 .01"/><path d="M12 17l0 .01"/><path d="M16 17l0 .01"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5l10 -10"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/><path d="M12 7v5l3 3"/></symbol>
+  <symbol id="i-door" viewBox="0 0 24 24"><path d="M14 12v.01"/><path d="M3 21h18"/><path d="M6 21v-16a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v16"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"/><path d="M7 11l5 5l5 -5"/><path d="M12 4l0 12"/></symbol>
+  <symbol id="i-eraser" viewBox="0 0 24 24"><path d="M19 20h-10.5l-4.21 -4.3a1 1 0 0 1 0 -1.41l10 -10a1 1 0 0 1 1.41 0l5 5a1 1 0 0 1 0 1.41l-9.2 9.3"/><path d="M18 13.3l-6.3 -6.3"/></symbol>
+  <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 5a5 5 0 0 1 7 0a5 5 0 0 0 7 0v9a5 5 0 0 1 -7 0a5 5 0 0 0 -7 0v-9z"/><path d="M5 21v-7"/></symbol>
+  <symbol id="i-gauge" viewBox="0 0 24 24"><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M13.41 10.59l2.59 -2.59"/><path d="M7 12a5 5 0 0 1 5 -5"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><path d="M16.555 3.843l3.602 3.602a2.877 2.877 0 0 1 0 4.069l-2.643 2.643a2.877 2.877 0 0 1 -4.069 0l-.301 -.301l-6.558 6.558a2 2 0 0 1 -1.239 .578l-.175 .008h-1.172a1 1 0 0 1 -.993 -.883l-.007 -.117v-1.172a2 2 0 0 1 .467 -1.284l.119 -.13l.414 -.414h2v-2h2v-2l2.144 -2.144l-.301 -.301a2.877 2.877 0 0 1 0 -4.069l2.643 -2.643a2.877 2.877 0 0 1 4.069 0z"/><path d="M15 9h.01"/></symbol>
+  <symbol id="i-lock-access" viewBox="0 0 24 24"><path d="M4 8v-2a2 2 0 0 1 2 -2h2"/><path d="M4 16v2a2 2 0 0 0 2 2h2"/><path d="M16 4h2a2 2 0 0 1 2 2v2"/><path d="M16 20h2a2 2 0 0 0 2 -2v-2"/><path d="M8 11m0 1a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1v3a1 1 0 0 1 -1 1h-6a1 1 0 0 1 -1 -1z"/><path d="M10 11v-2a2 2 0 1 1 4 0v2"/></symbol>
+  <symbol id="i-lock-open" viewBox="0 0 24 24"><path d="M5 11m0 2a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2z"/><path d="M12 16m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M8 11v-5a4 4 0 0 1 8 0"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6z"/><path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0"/><path d="M8 11v-4a4 4 0 1 1 8 0v4"/></symbol>
+  <symbol id="i-note" viewBox="0 0 24 24"><path d="M13 20l7 -7"/><path d="M13 20v-6a1 1 0 0 1 1 -1h6v-7a2 2 0 0 0 -2 -2h-12a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h7"/></symbol>
+  <symbol id="i-player-play" viewBox="0 0 24 24"><path d="M7 4v16l13 -8z"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/></symbol>
+  <symbol id="i-robot" viewBox="0 0 24 24"><path d="M6 4m0 2a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2z"/><path d="M12 2v2"/><path d="M9 12v9"/><path d="M15 12v9"/><path d="M5 16l4 -2"/><path d="M15 14l4 2"/><path d="M9 18h6"/><path d="M10 8v.01"/><path d="M14 8v.01"/></symbol>
+  <symbol id="i-route" viewBox="0 0 24 24"><path d="M3 19a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/><path d="M19 7a2 2 0 1 0 0 -4a2 2 0 0 0 0 4z"/><path d="M11 19h5.5a3.5 3.5 0 0 0 0 -7h-8a3.5 3.5 0 0 1 0 -7h4.5"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"/><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/></symbol>
+  <symbol id="i-shield-lock" viewBox="0 0 24 24"><path d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3"/><path d="M12 11m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M12 12l0 2.5"/></symbol>
+  <symbol id="i-terminal-2" viewBox="0 0 24 24"><path d="M8 9l3 3l-3 3"/><path d="M13 15l3 0"/><path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"/></symbol>
+  <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M8 21l8 0"/><path d="M12 17l0 4"/><path d="M7 4l10 0"/><path d="M17 4v8a5 5 0 0 1 -10 0v-8"/><path d="M5 9m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M19 9m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M9 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"/><path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0 -3 -3.85"/></symbol>
+</svg>
   <header class="topo">
     <div class="topo-marca">
-      <span class="logo" aria-hidden="true">{ }</span>
+      <svg class="logo" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+        <circle cx="17" cy="17" r="11" class="logo-aro"/>
+        <circle cx="17" cy="17" r="4" class="logo-furo"/>
+        <path d="M25 25l15 15m-6 -6l4 -4m-8 0l3 -3" class="logo-haste"/>
+      </svg>
       <div>
         <h1>Web Riddle JS</h1>
         <p class="subtitulo">A trilha das sete fechaduras</p>
       </div>
     </div>
     <div class="topo-info" id="app-topo-info" hidden>
-      <span>Dupla: <strong id="app-equipe"></strong></span>
-      <span>Tempo: <strong id="app-tempo">00:00</strong></span>
+      <span class="info-item"><svg class="icone" aria-hidden="true"><use href="#i-users"/></svg><span class="visualmente-oculto">Dupla:</span> <strong id="app-equipe"></strong></span>
+      <span class="info-item"><svg class="icone" aria-hidden="true"><use href="#i-clock"/></svg><span class="visualmente-oculto">Tempo:</span> <strong id="app-tempo">00:00</strong></span>
     </div>
   </header>
 
@@ -26,58 +61,79 @@
 
   <main id="app-principal">
     <section class="cartao boas-vindas" id="app-boas-vindas" hidden>
-      <h2>Antes de começar</h2>
-      <p>Em dupla: um digita, o outro lê e confere. Troquem a cada fechadura. A resposta de uma fechadura abre a próxima.</p>
-      <form id="app-form-equipe" class="linha-form">
-        <label for="app-nome-equipe">Nome da dupla <span class="nota">(apelido)</span></label>
-        <div class="linha">
-          <input id="app-nome-equipe" maxlength="30" autocomplete="off" required>
-          <button type="submit" class="botao primario">Começar a trilha</button>
-        </div>
-      </form>
+      <svg class="ilustracao" viewBox="0 0 240 200" aria-hidden="true" focusable="false">
+        <rect x="58" y="14" width="124" height="172" rx="8" class="il-rack"/>
+        <rect x="72" y="30" width="96" height="28" rx="4" class="il-gaveta"/>
+        <rect x="72" y="66" width="96" height="28" rx="4" class="il-gaveta"/>
+        <rect x="72" y="102" width="96" height="28" rx="4" class="il-gaveta"/>
+        <rect x="72" y="138" width="96" height="28" rx="4" class="il-gaveta"/>
+        <circle cx="84" cy="44" r="3" class="il-led il-led-1"/>
+        <circle cx="84" cy="80" r="3" class="il-led il-led-2"/>
+        <circle cx="84" cy="116" r="3" class="il-led il-led-3"/>
+        <circle cx="84" cy="152" r="3" class="il-led il-led-4"/>
+        <path d="M96 44h56M96 80h40M96 116h52M96 152h30" class="il-ranhura"/>
+        <path d="M8 36C40 58 80 84 112 102M128 102C160 84 200 58 232 36" class="il-corrente"/>
+        <g class="il-cadeado">
+          <path d="M108 112v-12a12 12 0 0 1 24 0v12" class="il-arco"/>
+          <rect x="100" y="110" width="40" height="34" rx="6" class="il-corpo"/>
+          <circle cx="120" cy="124" r="4" class="il-fenda"/>
+          <path d="M120 128v8" class="il-fenda-traco"/>
+        </g>
+      </svg>
+      <div class="boas-vindas-texto">
+        <h2>Antes de começar</h2>
+        <p>Em dupla: um digita, o outro lê e confere. Troquem a cada fechadura. A resposta de uma fechadura abre a próxima.</p>
+        <form id="app-form-equipe" class="linha-form">
+          <label for="app-nome-equipe">Nome da dupla <span class="nota">(apelido)</span></label>
+          <div class="linha">
+            <input id="app-nome-equipe" maxlength="30" autocomplete="off" required>
+            <button type="submit" class="botao primario"><svg class="icone" aria-hidden="true"><use href="#i-route"/></svg><span>Começar a trilha</span></button>
+          </div>
+        </form>
 
-      <details class="restaurar">
-        <summary>Continuar com um código</summary>
-      <form id="app-form-restaurar" class="linha-form">
-        <label for="app-codigo-restaurar" class="visualmente-oculto">Código de progresso</label>
-        <textarea id="app-codigo-restaurar" rows="3" spellcheck="false" autocomplete="off"></textarea>
-        <div class="linha">
-          <button type="submit" class="botao">Continuar</button>
-        </div>
-        <p id="app-mensagem-restaurar" class="mensagem" role="status"></p>
-      </form>
-      </details>
+        <details class="restaurar">
+          <summary>Continuar com um código</summary>
+          <form id="app-form-restaurar" class="linha-form">
+            <label for="app-codigo-restaurar" class="visualmente-oculto">Código de progresso</label>
+            <textarea id="app-codigo-restaurar" rows="3" spellcheck="false" autocomplete="off"></textarea>
+            <div class="linha">
+              <button type="submit" class="botao"><svg class="icone" aria-hidden="true"><use href="#i-lock-access"/></svg><span>Continuar</span></button>
+            </div>
+            <p id="app-mensagem-restaurar" class="mensagem" role="status"></p>
+          </form>
+        </details>
+      </div>
     </section>
 
     <div class="grade" id="app-grade" hidden>
-      <section class="cartao etapa" aria-live="polite">
+      <section class="cartao etapa" id="app-cartao-etapa" aria-live="polite">
         <div id="app-etapa"></div>
 
         <div class="dicas" id="app-dicas"></div>
 
         <form id="app-form-resposta" class="linha-form resposta">
           <label for="app-resposta">Pista desta fechadura</label>
-          <div class="linha">
+          <div class="linha" id="app-linha-resposta">
             <input id="app-resposta" autocomplete="off" spellcheck="false">
-            <button type="submit" class="botao primario" id="app-botao-abrir">Abrir fechadura</button>
+            <button type="submit" class="botao primario" id="app-botao-abrir"><svg class="icone" aria-hidden="true"><use href="#i-key"/></svg><span>Abrir fechadura</span></button>
           </div>
           <p id="app-mensagem" class="mensagem" role="status"></p>
         </form>
 
         <div class="acoes-etapa">
-          <button type="button" class="botao" id="app-reiniciar-etapa">Reiniciar etapa</button>
-          <button type="button" class="botao" id="app-baixar">Baixar nosso código</button>
-          <button type="button" class="botao" id="app-gerar-codigo">Código de progresso</button>
-          <button type="button" class="botao perigo" id="app-recomecar">Recomeçar a trilha</button>
+          <button type="button" class="botao" id="app-reiniciar-etapa"><svg class="icone" aria-hidden="true"><use href="#i-refresh"/></svg><span>Reiniciar etapa</span></button>
+          <button type="button" class="botao" id="app-baixar"><svg class="icone" aria-hidden="true"><use href="#i-download"/></svg><span>Baixar nosso código</span></button>
+          <button type="button" class="botao" id="app-gerar-codigo"><svg class="icone" aria-hidden="true"><use href="#i-note"/></svg><span>Código de progresso</span></button>
+          <button type="button" class="botao perigo" id="app-recomecar"><svg class="icone" aria-hidden="true"><use href="#i-arrow-back-up"/></svg><span>Recomeçar a trilha</span></button>
         </div>
 
         <section class="painel-codigo" id="app-painel-codigo" aria-labelledby="app-titulo-painel-codigo" hidden>
-          <h3 id="app-titulo-painel-codigo">Código de progresso</h3>
+          <h3 id="app-titulo-painel-codigo"><svg class="icone" aria-hidden="true"><use href="#i-note"/></svg>Código de progresso</h3>
           <p id="app-texto-painel-codigo"></p>
           <label for="app-codigo-progresso" class="visualmente-oculto">Código de progresso</label>
           <textarea id="app-codigo-progresso" rows="4" readonly spellcheck="false"></textarea>
           <div class="linha">
-            <button type="button" class="botao primario" id="app-copiar-codigo">Copiar código</button>
+            <button type="button" class="botao primario" id="app-copiar-codigo"><svg class="icone" aria-hidden="true"><use href="#i-check"/></svg><span>Copiar código</span></button>
           </div>
           <p id="app-status-copia" class="nota" role="status"></p>
         </section>
@@ -86,21 +142,21 @@
       <aside class="lateral">
         <section class="cartao bancada">
           <div class="bancada-topo">
-            <h2>Bancada</h2>
+            <h2><svg class="icone" aria-hidden="true"><use href="#i-terminal-2"/></svg>Bancada</h2>
             <span class="nota">Ctrl + Enter executa</span>
           </div>
           <label for="app-codigo" class="visualmente-oculto">Código JavaScript</label>
           <textarea id="app-codigo" spellcheck="false" autocomplete="off" placeholder="// escreva seu código aqui&#10;console.log(&quot;olá&quot;);"></textarea>
           <div class="linha">
-            <button type="button" class="botao primario" id="app-executar">Executar</button>
-            <button type="button" class="botao" id="app-limpar">Limpar saída</button>
+            <button type="button" class="botao primario" id="app-executar"><svg class="icone" aria-hidden="true"><use href="#i-player-play"/></svg><span>Executar</span></button>
+            <button type="button" class="botao" id="app-limpar"><svg class="icone" aria-hidden="true"><use href="#i-eraser"/></svg><span>Limpar saída</span></button>
           </div>
           <h3 class="saida-titulo">Saída</h3>
           <div id="app-saida" class="saida" aria-live="polite"></div>
         </section>
 
         <section class="cartao mochila">
-          <h2>Mochila de pistas</h2>
+          <h2><svg class="icone" aria-hidden="true"><use href="#i-backpack"/></svg>Mochila de pistas</h2>
           <ol id="app-mochila"></ol>
         </section>
       </aside>
